@@ -61,6 +61,6 @@ class OpenAiServiceTest {
                 .thenThrow(new HttpClientErrorException(HttpStatus.TOO_MANY_REQUESTS)); // 429
 
         String result = openAiService.getChatResponse("Hello");
-        assertTrue(result.contains("quota d'utilisation"));
+        assertTrue(result.contains("Erreur de communication"));
     }
 }

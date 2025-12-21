@@ -1,5 +1,7 @@
 package com.hospital.dashboard.controller;
 
+import com.hospital.dashboard.service.CustomAIService;
+import com.hospital.dashboard.service.ForecastServiceV2;
 import com.hospital.dashboard.service.OpenAiService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,9 +24,17 @@ class CustomAIControllerTest {
     @MockBean
     private OpenAiService openAiService;
 
+    @MockBean
+    private ForecastServiceV2 forecastService;
+
+    @MockBean
+    private CustomAIService customAIService;
+
     @Test
     void testAsk() throws Exception {
-        given(openAiService.getChatResponse(anyString())).willReturn("AI Answer");
+        given(customAIService.isTrained()).willReturn(true); // Mock training check
+        given(openAiService.getChatResponse(anyString(), any())).willReturn("AI Answer"); // Updated mock to match 2-arg
+                                                                                          // call
 
         mockMvc.perform(post("/api/custom-ai/ask")
                 .contentType(MediaType.APPLICATION_JSON)
