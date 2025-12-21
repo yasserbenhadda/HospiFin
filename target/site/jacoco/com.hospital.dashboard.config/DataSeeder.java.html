@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DataSeeder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">dashboard</a> &gt; <a href="index.source.html" class="el_package">com.hospital.dashboard.config</a> &gt; <span class="el_source">DataSeeder.java</span></div><h1>DataSeeder.java</h1><pre class="source lang-java linenums">package com.hospital.dashboard.config;
+
+import com.hospital.dashboard.model.*;
+import com.hospital.dashboard.repository.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.List;
+
+import java.util.concurrent.ThreadLocalRandom;
+
+@Component
+<span class="fc" id="L17">public class DataSeeder implements CommandLineRunner {</span>
+
+        @Autowired
+        private PatientRepository patientRepository;
+        @Autowired
+        private HospitalStayRepository stayRepository;
+        @Autowired
+        private MedicalActRepository medicalActRepository;
+        @Autowired
+        private MedicationRepository medicationRepository;
+        @Autowired
+        private ConsumableRepository consumableRepository;
+        @Autowired
+        private PersonnelRepository personnelRepository;
+
+<span class="fc" id="L32">        private final java.security.SecureRandom random = new java.security.SecureRandom();</span>
+
+        @Override
+        public void run(String... args) throws Exception {
+<span class="pc bpc" id="L36" title="1 of 4 branches missed.">                if (personnelRepository.findByEmail(&quot;house@hospital.com&quot;) != null || patientRepository.count() &gt; 0) {</span>
+<span class="fc" id="L37">                        System.out.println(&quot;Cleaning up old random data to inject realistic trends...&quot;);</span>
+<span class="fc" id="L38">                        consumableRepository.deleteAll();</span>
+<span class="fc" id="L39">                        medicalActRepository.deleteAll();</span>
+<span class="fc" id="L40">                        stayRepository.deleteAll();</span>
+<span class="fc" id="L41">                        medicationRepository.deleteAll();</span>
+<span class="fc" id="L42">                        personnelRepository.deleteAll();</span>
+<span class="fc" id="L43">                        patientRepository.deleteAll();</span>
+                }
+
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">                if (patientRepository.count() == 0) {</span>
+<span class="fc" id="L47">                        seedPatients();</span>
+<span class="fc" id="L48">                        seedPersonnel();</span>
+<span class="fc" id="L49">                        seedMedications();</span>
+<span class="fc" id="L50">                        seedAdditionalMedications();</span>
+<span class="fc" id="L51">                        seedRealisticHistoricalData();</span>
+                }
+<span class="fc" id="L53">        }</span>
+
+        private void seedPatients() {
+<span class="fc" id="L56">                patientRepository.saveAll(Arrays.asList(</span>
+<span class="fc" id="L57">                                new Patient(null, &quot;Jean&quot;, &quot;Dupont&quot;, &quot;1234567890123&quot;, LocalDate.of(1980, 5, 15)),</span>
+<span class="fc" id="L58">                                new Patient(null, &quot;Marie&quot;, &quot;Curie&quot;, &quot;2345678901234&quot;, LocalDate.of(1975, 11, 7)),</span>
+<span class="fc" id="L59">                                new Patient(null, &quot;Pierre&quot;, &quot;Martin&quot;, &quot;3456789012345&quot;, LocalDate.of(1990, 2, 20)),</span>
+<span class="fc" id="L60">                                new Patient(null, &quot;Sophie&quot;, &quot;Durand&quot;, &quot;4567890123456&quot;, LocalDate.of(2001, 8, 30))));</span>
+<span class="fc" id="L61">        }</span>
+
+        private void seedPersonnel() {
+<span class="fc" id="L64">                personnelRepository.saveAll(Arrays.asList(</span>
+                                new Personnel(null, &quot;Dr. Sophie Martin&quot;, &quot;ADMIN&quot;, &quot;Administration&quot;,
+                                                new BigDecimal(&quot;500.00&quot;), &quot;sophie.martin@hospital.com&quot;, &quot;0123456789&quot;),
+                                new Personnel(null, &quot;Dr. House&quot;, &quot;DOCTOR&quot;, &quot;Diagnostic&quot;, new BigDecimal(&quot;800.00&quot;),
+                                                &quot;house@hospital.com&quot;, &quot;0987654321&quot;),
+                                new Personnel(null, &quot;Nurse Joy&quot;, &quot;NURSE&quot;, &quot;Emergency&quot;, new BigDecimal(&quot;300.00&quot;),
+                                                &quot;joy@hospital.com&quot;, &quot;1122334455&quot;),
+                                new Personnel(null, &quot;Dr. Strange&quot;, &quot;SURGEON&quot;, &quot;Surgery&quot;, new BigDecimal(&quot;900.00&quot;),
+                                                &quot;strange@hospital.com&quot;, &quot;2233445566&quot;)));
+<span class="fc" id="L73">        }</span>
+
+        private void seedMedications() {
+<span class="fc" id="L76">                medicationRepository.saveAll(Arrays.asList(</span>
+<span class="fc" id="L77">                                new Medication(null, &quot;Paracetamol&quot;, &quot;Analgesic&quot;, new BigDecimal(&quot;5.00&quot;), 100, &quot;Box&quot;),</span>
+<span class="fc" id="L78">                                new Medication(null, &quot;Ibuprofen&quot;, &quot;Anti-inflammatory&quot;, new BigDecimal(&quot;8.00&quot;), 50,</span>
+                                                &quot;Box&quot;),
+<span class="fc" id="L80">                                new Medication(null, &quot;Amoxicillin&quot;, &quot;Antibiotic&quot;, new BigDecimal(&quot;12.00&quot;), 30, &quot;Box&quot;),</span>
+<span class="fc" id="L81">                                new Medication(null, &quot;Spasfon&quot;, &quot;Antispasmodic&quot;, new BigDecimal(&quot;6.00&quot;), 80, &quot;Box&quot;)));</span>
+<span class="fc" id="L82">        }</span>
+
+        private void seedAdditionalMedications() {
+<span class="fc" id="L85">                medicationRepository.saveAll(Arrays.asList(</span>
+<span class="fc" id="L86">                                new Medication(null, &quot;Doliprane&quot;, &quot;Analgesic&quot;, new BigDecimal(&quot;2.50&quot;), 200, &quot;Box&quot;),</span>
+<span class="fc" id="L87">                                new Medication(null, &quot;Smecta&quot;, &quot;Digestive&quot;, new BigDecimal(&quot;6.50&quot;), 100, &quot;Box&quot;),</span>
+<span class="fc" id="L88">                                new Medication(null, &quot;Ventolin&quot;, &quot;Respiratory&quot;, new BigDecimal(&quot;15.00&quot;), 40, &quot;Inhaler&quot;),</span>
+<span class="fc" id="L89">                                new Medication(null, &quot;Cardioaspirin&quot;, &quot;Cardiovascular&quot;, new BigDecimal(&quot;10.00&quot;), 60,</span>
+                                                &quot;Box&quot;)));
+<span class="fc" id="L91">        }</span>
+
+        private void seedRealisticHistoricalData() {
+<span class="fc" id="L94">                List&lt;Patient&gt; patients = patientRepository.findAll();</span>
+<span class="fc" id="L95">                List&lt;Medication&gt; medications = medicationRepository.findAll();</span>
+<span class="fc" id="L96">                List&lt;Personnel&gt; personnelList = personnelRepository.findAll();</span>
+
+<span class="fc" id="L98">                LocalDate endDate = LocalDate.now();</span>
+<span class="fc" id="L99">                LocalDate startDate = endDate.minusMonths(6);</span>
+<span class="fc" id="L100">                long totalDays = java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate);</span>
+
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                for (int i = 0; i &lt;= totalDays; i++) {</span>
+<span class="fc" id="L103">                        LocalDate date = startDate.plusDays(i);</span>
+
+                        // Trend Logic: 30% growth over 6 months, weekends lower
+<span class="fc" id="L106">                        double progress = (double) i / totalDays;</span>
+<span class="fc" id="L107">                        double growthFactor = 1.0 + (progress * 0.30);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">                        boolean isWeekend = date.getDayOfWeek().getValue() &gt;= 6;</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                        double seasonality = isWeekend ? 0.6 : 1.1;</span>
+<span class="fc" id="L110">                        double dailyFactor = growthFactor * seasonality;</span>
+
+<span class="fc bfc" id="L112" title="All 2 branches covered.">                        if (random.nextDouble() &lt; (0.3 * dailyFactor)) {</span>
+<span class="fc" id="L113">                                createRandomStay(date, patients, dailyFactor);</span>
+                        }
+
+<span class="fc" id="L116">                        int actCount = (int) Math.round(random.nextInt(3) * dailyFactor);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">                        for (int k = 0; k &lt; actCount; k++) {</span>
+<span class="fc" id="L118">                                createRandomMedicalAct(date, patients, personnelList, dailyFactor);</span>
+                        }
+
+<span class="fc" id="L121">                        int consCount = (int) Math.round((random.nextInt(4) + 1) * dailyFactor);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">                        for (int k = 0; k &lt; consCount; k++) {</span>
+<span class="fc" id="L123">                                createRandomConsumable(date, patients, medications, dailyFactor);</span>
+                        }
+                }
+<span class="fc" id="L126">        }</span>
+
+        private void createRandomStay(LocalDate startDate, List&lt;Patient&gt; patients, double priceMultiplier) {
+<span class="fc" id="L129">                HospitalStay stay = new HospitalStay(</span>
+                                null,
+<span class="fc" id="L131">                                getRandom(patients),</span>
+                                startDate,
+<span class="fc" id="L133">                                startDate.plusDays((long) random.nextInt(8) + 2),</span>
+<span class="fc" id="L134">                                generatePrice(150, priceMultiplier, 50),</span>
+<span class="fc" id="L135">                                getRandom(&quot;Flu&quot;, &quot;Surgery&quot;, &quot;Observation&quot;, &quot;Emergency&quot;, &quot;Checkup&quot;, &quot;Rehabilitation&quot;));</span>
+<span class="fc" id="L136">                stayRepository.save(stay);</span>
+<span class="fc" id="L137">        }</span>
+
+        private void createRandomMedicalAct(LocalDate date, List&lt;Patient&gt; patients, List&lt;Personnel&gt; personnelList,
+                        double priceMultiplier) {
+<span class="fc" id="L141">                String actType = getRandom(&quot;Consultation&quot;, &quot;X-Ray&quot;, &quot;Blood Test&quot;, &quot;MRI&quot;, &quot;Surgery&quot;, &quot;Vaccination&quot;);</span>
+<span class="fc bfc" id="L142" title="All 4 branches covered.">                int baseCost = switch (actType) {</span>
+<span class="fc" id="L143">                        case &quot;Surgery&quot; -&gt; 500;</span>
+<span class="fc" id="L144">                        case &quot;MRI&quot; -&gt; 300;</span>
+<span class="fc" id="L145">                        case &quot;Consultation&quot; -&gt; 30;</span>
+<span class="fc" id="L146">                        default -&gt; 50;</span>
+                };
+
+<span class="fc" id="L149">                MedicalAct act = new MedicalAct(</span>
+                                null,
+                                actType,
+                                date,
+<span class="fc" id="L153">                                getRandom(patients),</span>
+<span class="fc" id="L154">                                getRandom(personnelList).getName(),</span>
+<span class="fc" id="L155">                                generatePrice(baseCost, priceMultiplier, 20));</span>
+<span class="fc" id="L156">                medicalActRepository.save(act);</span>
+<span class="fc" id="L157">        }</span>
+
+        private void createRandomConsumable(LocalDate date, List&lt;Patient&gt; patients, List&lt;Medication&gt; medications,
+                        double priceMultiplier) {
+<span class="fc" id="L161">                Medication medication = getRandom(medications);</span>
+<span class="fc" id="L162">                int quantity = random.nextInt(3) + 1;</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">                if (priceMultiplier &gt; 1.2)</span>
+<span class="fc" id="L164">                        quantity++;</span>
+
+<span class="fc" id="L166">                Consumable consumable = new Consumable(</span>
+                                null,
+                                medication,
+<span class="fc" id="L169">                                quantity,</span>
+                                date,
+<span class="fc" id="L171">                                getRandom(patients),</span>
+<span class="fc" id="L172">                                medication.getUnitCost().multiply(BigDecimal.valueOf(quantity)));</span>
+<span class="fc" id="L173">                consumableRepository.save(consumable);</span>
+<span class="fc" id="L174">        }</span>
+
+        private &lt;T&gt; T getRandom(List&lt;T&gt; list) {
+<span class="fc" id="L177">                return list.get(random.nextInt(list.size()));</span>
+        }
+
+        private String getRandom(String... items) {
+<span class="fc" id="L181">                return items[random.nextInt(items.length)];</span>
+        }
+
+        private BigDecimal generatePrice(int base, double multiplier, int variance) {
+<span class="fc" id="L185">                return BigDecimal.valueOf(base * multiplier + random.nextInt(variance));</span>
+        }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MedicalActController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">dashboard</a> &gt; <a href="index.source.html" class="el_package">com.hospital.dashboard.controller</a> &gt; <span class="el_source">MedicalActController.java</span></div><h1>MedicalActController.java</h1><pre class="source lang-java linenums">package com.hospital.dashboard.controller;
+
+import com.hospital.dashboard.model.MedicalAct;
+import com.hospital.dashboard.repository.MedicalActRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+
+@RestController
+@RequestMapping(&quot;/api/medical-acts&quot;)
+
+<span class="fc" id="L14">public class MedicalActController extends BaseController&lt;MedicalAct, Long&gt; {</span>
+
+    @Autowired
+    private MedicalActRepository medicalActRepository;
+
+    @Override
+    protected JpaRepository&lt;MedicalAct, Long&gt; getRepository() {
+<span class="fc" id="L21">        return medicalActRepository;</span>
+    }
+
+    @PutMapping(&quot;/{id}&quot;)
+    public MedicalAct updateMedicalAct(@PathVariable Long id, @RequestBody MedicalAct medicalActDetails) {
+<span class="fc" id="L26">        MedicalAct medicalAct = medicalActRepository.findById(id).orElseThrow();</span>
+<span class="fc" id="L27">        medicalAct.setType(medicalActDetails.getType());</span>
+<span class="fc" id="L28">        medicalAct.setDate(medicalActDetails.getDate());</span>
+<span class="fc" id="L29">        medicalAct.setPatient(medicalActDetails.getPatient());</span>
+<span class="fc" id="L30">        medicalAct.setPractitioner(medicalActDetails.getPractitioner());</span>
+<span class="fc" id="L31">        medicalAct.setCost(medicalActDetails.getCost());</span>
+<span class="fc" id="L32">        return medicalActRepository.save(medicalAct);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

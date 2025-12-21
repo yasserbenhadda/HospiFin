@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ForecastServiceV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">dashboard</a> &gt; <a href="index.source.html" class="el_package">com.hospital.dashboard.service</a> &gt; <span class="el_source">ForecastServiceV2.java</span></div><h1>ForecastServiceV2.java</h1><pre class="source lang-java linenums">package com.hospital.dashboard.service;
+
+import com.hospital.dashboard.model.Consumable;
+import com.hospital.dashboard.model.HospitalStay;
+import com.hospital.dashboard.model.MedicalAct;
+import com.hospital.dashboard.repository.ConsumableRepository;
+import com.hospital.dashboard.repository.HospitalStayRepository;
+import com.hospital.dashboard.repository.MedicalActRepository;
+import com.hospital.dashboard.repository.PersonnelRepository;
+import com.hospital.dashboard.model.Personnel;
+import org.apache.commons.math3.stat.regression.SimpleRegression;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+
+@Service
+<span class="fc" id="L21">public class ForecastServiceV2 {</span>
+
+    @Autowired
+    private MedicalActRepository medicalActRepository;
+    @Autowired
+    private ConsumableRepository consumableRepository;
+    @Autowired
+    private HospitalStayRepository stayRepository;
+    @Autowired
+    private PersonnelRepository personnelRepository;
+    @Autowired
+    private RevenueService revenueService;
+
+    public Map&lt;String, Object&gt; getGlobalForecast(int days) {
+        // Increase daily resolution threshold to cover 90 days
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        boolean isDaily = days &lt;= 120;</span>
+<span class="fc" id="L37">        Map&lt;String, Object&gt; response = new HashMap&lt;&gt;();</span>
+
+        // 1. Predictions per category
+<span class="fc" id="L40">        Map&lt;String, Object&gt; medicalActsData = predictMedicalActsCosts(days, isDaily);</span>
+<span class="fc" id="L41">        response.put(&quot;medicalActs&quot;, medicalActsData);</span>
+
+<span class="fc" id="L43">        Map&lt;String, Object&gt; consumablesData = predictConsumablesCosts(days, isDaily);</span>
+<span class="fc" id="L44">        response.put(&quot;consumables&quot;, consumablesData);</span>
+
+<span class="fc" id="L46">        Map&lt;String, Object&gt; staysData = predictStaysCosts(days, isDaily);</span>
+<span class="fc" id="L47">        response.put(&quot;stays&quot;, staysData);</span>
+
+        // 2. Global Totals
+<span class="fc" id="L50">        BigDecimal totalCurrent = ((BigDecimal) medicalActsData.get(&quot;currentTotal&quot;))</span>
+<span class="fc" id="L51">                .add((BigDecimal) consumablesData.get(&quot;currentTotal&quot;))</span>
+<span class="fc" id="L52">                .add((BigDecimal) staysData.get(&quot;currentTotal&quot;));</span>
+
+        // Add Personnel Cost (Base Load)
+<span class="fc" id="L55">        BigDecimal dailyPersonnelCost = personnelRepository.findAll().stream()</span>
+<span class="fc" id="L56">                .map(Personnel::getCostPerDay)</span>
+<span class="fc" id="L57">                .filter(Objects::nonNull)</span>
+<span class="fc" id="L58">                .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+
+        // Add 30 days of personnel cost to current total (to match DashboardService
+        // logic)
+<span class="fc" id="L62">        totalCurrent = totalCurrent.add(dailyPersonnelCost.multiply(BigDecimal.valueOf(30)));</span>
+
+<span class="fc" id="L64">        BigDecimal totalPredicted = ((BigDecimal) medicalActsData.get(&quot;predictedTotal&quot;))</span>
+<span class="fc" id="L65">                .add((BigDecimal) consumablesData.get(&quot;predictedTotal&quot;))</span>
+<span class="fc" id="L66">                .add((BigDecimal) staysData.get(&quot;predictedTotal&quot;));</span>
+
+        // Add 30 days of personnel cost to predicted total
+<span class="fc" id="L69">        totalPredicted = totalPredicted.add(dailyPersonnelCost.multiply(BigDecimal.valueOf(30)));</span>
+
+<span class="fc" id="L71">        response.put(&quot;globalTotal&quot;, totalCurrent);</span>
+<span class="fc" id="L72">        response.put(&quot;globalPrediction&quot;, totalPredicted);</span>
+
+        // 3. Aggregate Global History (Real + Predicted)
+<span class="fc" id="L75">        Object actsHistoryRaw = medicalActsData.get(&quot;history&quot;);</span>
+<span class="fc" id="L76">        Object consHistoryRaw = consumablesData.get(&quot;history&quot;);</span>
+<span class="fc" id="L77">        Object staysHistoryRaw = staysData.get(&quot;history&quot;);</span>
+
+        @SuppressWarnings(&quot;unchecked&quot;)
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        List&lt;Map&lt;String, Object&gt;&gt; actsHistory = actsHistoryRaw instanceof List</span>
+<span class="fc" id="L81">                ? (List&lt;Map&lt;String, Object&gt;&gt;) actsHistoryRaw</span>
+<span class="pc" id="L82">                : new ArrayList&lt;&gt;();</span>
+        @SuppressWarnings(&quot;unchecked&quot;)
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        List&lt;Map&lt;String, Object&gt;&gt; consHistory = consHistoryRaw instanceof List</span>
+<span class="fc" id="L85">                ? (List&lt;Map&lt;String, Object&gt;&gt;) consHistoryRaw</span>
+<span class="pc" id="L86">                : new ArrayList&lt;&gt;();</span>
+        @SuppressWarnings(&quot;unchecked&quot;)
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        List&lt;Map&lt;String, Object&gt;&gt; staysHistory = staysHistoryRaw instanceof List</span>
+<span class="fc" id="L89">                ? (List&lt;Map&lt;String, Object&gt;&gt;) staysHistoryRaw</span>
+<span class="pc" id="L90">                : new ArrayList&lt;&gt;();</span>
+
+        // Merge all histories by date/month
+<span class="fc" id="L93">        Map&lt;String, Map&lt;String, BigDecimal&gt;&gt; mergedMap = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L94">        mergeHistory(mergedMap, actsHistory);</span>
+<span class="fc" id="L95">        mergeHistory(mergedMap, consHistory);</span>
+<span class="fc" id="L96">        mergeHistory(mergedMap, staysHistory);</span>
+
+<span class="fc" id="L98">        List&lt;Map&lt;String, Object&gt;&gt; globalHistory = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        for (Map.Entry&lt;String, Map&lt;String, BigDecimal&gt;&gt; entry : mergedMap.entrySet()) {</span>
+<span class="fc" id="L100">            Map&lt;String, Object&gt; point = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L101">            point.put(&quot;month&quot;, entry.getKey()); // &quot;month&quot; key kept for compatibility, but contains date if daily</span>
+            // Only put &quot;real&quot; if it exists, otherwise leave entirely out (undefined in JS)
+<span class="fc" id="L103">            BigDecimal realVal = entry.getValue().get(&quot;real&quot;);</span>
+<span class="fc" id="L104">            BigDecimal predVal = entry.getValue().get(&quot;predicted&quot;);</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            BigDecimal basePred = predVal != null ? predVal : BigDecimal.ZERO;</span>
+
+            // Add personnel baseline
+            // If isDaily, add 1 day cost. If monthly, add ~30 days cost.
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            BigDecimal personnelAdder = isDaily ? dailyPersonnelCost</span>
+<span class="pc" id="L110">                    : dailyPersonnelCost.multiply(BigDecimal.valueOf(30));</span>
+
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            if (realVal != null) {</span>
+                // Add personnel cost to Real
+<span class="fc" id="L114">                realVal = realVal.add(personnelAdder);</span>
+<span class="fc" id="L115">                point.put(&quot;real&quot;, realVal);</span>
+<span class="fc" id="L116">                point.put(&quot;cost&quot;, realVal);</span>
+            }
+
+            // Add personnel cost to Predicted
+<span class="fc" id="L120">            basePred = basePred.add(personnelAdder);</span>
+<span class="fc" id="L121">            point.put(&quot;predicted&quot;, basePred);</span>
+
+<span class="fc" id="L123">            globalHistory.add(point);</span>
+<span class="fc" id="L124">        }</span>
+<span class="fc" id="L125">        response.put(&quot;globalHistory&quot;, globalHistory);</span>
+
+<span class="fc" id="L127">        return response;</span>
+    }
+
+    private void mergeHistory(Map&lt;String, Map&lt;String, BigDecimal&gt;&gt; target, List&lt;Map&lt;String, Object&gt;&gt; source) {
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (source == null)</span>
+<span class="nc" id="L132">            return;</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (Map&lt;String, Object&gt; item : source) {</span>
+<span class="fc" id="L134">            String key = (String) item.get(&quot;month&quot;); // Date key</span>
+<span class="fc" id="L135">            BigDecimal real = (BigDecimal) item.get(&quot;real&quot;);</span>
+<span class="fc" id="L136">            BigDecimal predicted = (BigDecimal) item.get(&quot;predicted&quot;);</span>
+
+<span class="fc" id="L138">            target.putIfAbsent(key, new HashMap&lt;&gt;());</span>
+<span class="fc" id="L139">            Map&lt;String, BigDecimal&gt; prices = target.get(key);</span>
+
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (real != null) {</span>
+<span class="fc" id="L142">                prices.merge(&quot;real&quot;, real, BigDecimal::add);</span>
+            }
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">            if (predicted != null) {</span>
+<span class="fc" id="L145">                prices.merge(&quot;predicted&quot;, predicted, BigDecimal::add);</span>
+            }
+<span class="fc" id="L147">        }</span>
+<span class="fc" id="L148">    }</span>
+
+    private Map&lt;String, Object&gt; predictMedicalActsCosts(int days, boolean isDaily) {
+<span class="fc" id="L151">        List&lt;MedicalAct&gt; acts = medicalActRepository.findAll();</span>
+<span class="fc" id="L152">        return calculatePrediction(acts, MedicalAct::getDate, MedicalAct::getCost, days, isDaily);</span>
+    }
+
+    private Map&lt;String, Object&gt; predictConsumablesCosts(int days, boolean isDaily) {
+<span class="fc" id="L156">        List&lt;Consumable&gt; consumables = consumableRepository.findAll();</span>
+<span class="fc" id="L157">        return calculatePrediction(consumables, Consumable::getDate, Consumable::getTotalCost, days, isDaily);</span>
+    }
+
+    private Map&lt;String, Object&gt; predictStaysCosts(int days, boolean isDaily) {
+<span class="fc" id="L161">        List&lt;HospitalStay&gt; stays = stayRepository.findAll();</span>
+<span class="fc" id="L162">        return calculatePrediction(stays, HospitalStay::getStartDate,</span>
+<span class="fc" id="L163">                stay -&gt; revenueService.calculateStayRevenue(stay), days, isDaily);</span>
+    }
+
+    private &lt;T&gt; Map&lt;String, Object&gt; calculatePrediction(List&lt;T&gt; items,
+            java.util.function.Function&lt;T, LocalDate&gt; dateExtractor,
+            java.util.function.Function&lt;T, BigDecimal&gt; costExtractor,
+            int daysToPredict, boolean isDaily) {
+
+<span class="fc" id="L171">        Map&lt;String, Object&gt; result = new HashMap&lt;&gt;();</span>
+
+        // 1. Group Data &amp; Calculate Seasonality
+<span class="fc" id="L174">        Map&lt;String, BigDecimal&gt; groupedCosts = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L175">        BigDecimal currentTotal = BigDecimal.ZERO;</span>
+
+        // Seasonality Helpers
+<span class="fc" id="L178">        Map&lt;java.time.DayOfWeek, List&lt;BigDecimal&gt;&gt; dayOfWeekValues = new EnumMap&lt;&gt;(java.time.DayOfWeek.class);</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        for (java.time.DayOfWeek day : java.time.DayOfWeek.values()) {</span>
+<span class="fc" id="L180">            dayOfWeekValues.put(day, new ArrayList&lt;&gt;());</span>
+        }
+
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        DateTimeFormatter formatter = isDaily ? DateTimeFormatter.ISO_LOCAL_DATE</span>
+<span class="pc" id="L184">                : DateTimeFormatter.ofPattern(&quot;yyyy-MM&quot;);</span>
+
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        for (T item : items) {</span>
+<span class="fc" id="L187">            LocalDate date = dateExtractor.apply(item);</span>
+<span class="fc" id="L188">            BigDecimal cost = costExtractor.apply(item);</span>
+
+<span class="pc bpc" id="L190" title="2 of 4 branches missed.">            if (date != null &amp;&amp; cost != null) {</span>
+<span class="fc" id="L191">                String key = date.format(formatter);</span>
+<span class="fc" id="L192">                groupedCosts.merge(key, cost, BigDecimal::add);</span>
+<span class="fc" id="L193">                currentTotal = currentTotal.add(cost);</span>
+
+                // Collect for seasonality (only makes sense for Daily)
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">                if (isDaily) {</span>
+<span class="fc" id="L197">                    dayOfWeekValues.get(date.getDayOfWeek()).add(cost);</span>
+                }
+            }
+<span class="fc" id="L200">        }</span>
+
+        // Calculate Seasonality Indices
+<span class="fc" id="L203">        Map&lt;java.time.DayOfWeek, Double&gt; seasonalityIndices = new EnumMap&lt;&gt;(java.time.DayOfWeek.class);</span>
+<span class="pc bpc" id="L204" title="1 of 4 branches missed.">        if (isDaily &amp;&amp; !groupedCosts.isEmpty()) {</span>
+<span class="fc" id="L205">            BigDecimal globalSum = BigDecimal.ZERO;</span>
+<span class="fc" id="L206">            long globalCount = 0;</span>
+
+            // Calculate Global Average
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            for (BigDecimal val : groupedCosts.values()) {</span>
+<span class="fc" id="L210">                globalSum = globalSum.add(val);</span>
+<span class="fc" id="L211">                globalCount++;</span>
+<span class="fc" id="L212">            }</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">            double globalAvg = globalCount &gt; 0 ? globalSum.doubleValue() / globalCount : 0;</span>
+
+            // Calculate Index per Day
+<span class="fc bfc" id="L216" title="All 2 branches covered.">            for (java.time.DayOfWeek day : java.time.DayOfWeek.values()) {</span>
+<span class="fc" id="L217">                List&lt;BigDecimal&gt; values = dayOfWeekValues.get(day);</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">                if (values.isEmpty()) {</span>
+<span class="fc" id="L219">                    seasonalityIndices.put(day, 1.0); // Neutral</span>
+                } else {
+<span class="fc" id="L221">                    double daySum = values.stream().mapToDouble(BigDecimal::doubleValue).sum();</span>
+<span class="fc" id="L222">                    double dayAvg = daySum / values.size();</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">                    double index = (globalAvg != 0) ? (dayAvg / globalAvg) : 1.0;</span>
+                    // Dampen the index specifically for the graph to not go to 0 completely (e.g.
+                    // min 0.2)
+                    // If index is &lt; 0.2, likely missing data, boost it a bit for smoothing or keep
+                    // raw.
+                    // Let's keep raw but safeguard against extreme 0s if broad history suggests
+                    // otherwise.
+<span class="fc" id="L230">                    seasonalityIndices.put(day, index);</span>
+                }
+            }
+        }
+
+        // 2. Regression
+<span class="fc" id="L236">        SimpleRegression regression = new SimpleRegression();</span>
+<span class="fc" id="L237">        List&lt;Map&lt;String, Object&gt;&gt; history = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L239">        long firstTime = -1;</span>
+
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        for (Map.Entry&lt;String, BigDecimal&gt; entry : groupedCosts.entrySet()) {</span>
+            double xVal;
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">            if (isDaily) {</span>
+<span class="fc" id="L244">                xVal = LocalDate.parse(entry.getKey(), formatter).toEpochDay();</span>
+            } else {
+<span class="nc" id="L246">                String[] parts = entry.getKey().split(&quot;-&quot;);</span>
+<span class="nc" id="L247">                xVal = (double) Integer.parseInt(parts[0]) * 12 + Integer.parseInt(parts[1]);</span>
+            }
+
+<span class="fc bfc" id="L250" title="All 2 branches covered.">            if (firstTime == -1)</span>
+<span class="fc" id="L251">                firstTime = (long) xVal;</span>
+
+<span class="fc" id="L253">            regression.addData(xVal, entry.getValue().doubleValue());</span>
+<span class="fc" id="L254">        }</span>
+
+        // 3. Build History
+        // Filter Logic
+<span class="fc" id="L258">        LocalDate limitDate = LocalDate.now().minusDays(daysToPredict);</span>
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">        if (!isDaily) {</span>
+<span class="nc" id="L260">            limitDate = LocalDate.now().minusMonths(daysToPredict / 30);</span>
+        }
+
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        for (Map.Entry&lt;String, BigDecimal&gt; entry : groupedCosts.entrySet()) {</span>
+            double xVal;
+            LocalDate entryDate;
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">            if (isDaily) {</span>
+<span class="fc" id="L267">                entryDate = LocalDate.parse(entry.getKey(), formatter);</span>
+<span class="fc" id="L268">                xVal = entryDate.toEpochDay();</span>
+            } else {
+<span class="nc" id="L270">                String[] parts = entry.getKey().split(&quot;-&quot;);</span>
+<span class="nc" id="L271">                entryDate = LocalDate.of(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), 1);</span>
+<span class="nc" id="L272">                xVal = (double) Integer.parseInt(parts[0]) * 12 + Integer.parseInt(parts[1]);</span>
+            }
+
+            // FILTER APPLIED HERE
+<span class="fc bfc" id="L276" title="All 2 branches covered.">            if (entryDate.isBefore(limitDate)) {</span>
+<span class="fc" id="L277">                continue;</span>
+            }
+
+            // Raw Regression Prediction
+<span class="fc" id="L281">            double trend = regression.predict(xVal);</span>
+
+            // Apply Seasonality (Back-test on history to see fit)
+<span class="fc" id="L284">            double predicted = trend;</span>
+<span class="pc bpc" id="L285" title="2 of 4 branches missed.">            if (isDaily &amp;&amp; seasonalityIndices.containsKey(entryDate.getDayOfWeek())) {</span>
+<span class="fc" id="L286">                predicted *= seasonalityIndices.get(entryDate.getDayOfWeek());</span>
+            }
+
+<span class="fc" id="L289">            Map&lt;String, Object&gt; point = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L290">            point.put(&quot;month&quot;, entry.getKey());</span>
+<span class="fc" id="L291">            point.put(&quot;real&quot;, entry.getValue());</span>
+<span class="fc" id="L292">            point.put(&quot;predicted&quot;, BigDecimal.valueOf(Math.max(0, predicted)));</span>
+
+<span class="fc" id="L294">            history.add(point);</span>
+<span class="fc" id="L295">        }</span>
+
+        // 4. Future Predictions
+<span class="fc" id="L298">        double totalFuturePredicted = 0.0;</span>
+<span class="fc" id="L299">        long lastX = -1;</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">        if (!groupedCosts.isEmpty()) {</span>
+<span class="fc" id="L301">            String lastKey = ((TreeMap&lt;String, BigDecimal&gt;) groupedCosts).lastKey();</span>
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">            if (isDaily) {</span>
+<span class="fc" id="L303">                lastX = LocalDate.parse(lastKey, formatter).toEpochDay();</span>
+            } else {
+<span class="nc" id="L305">                String[] parts = lastKey.split(&quot;-&quot;);</span>
+<span class="nc" id="L306">                lastX = (long) Integer.parseInt(parts[0]) * 12 + Integer.parseInt(parts[1]);</span>
+            }
+        }
+
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">        int steps = isDaily ? daysToPredict : (int) Math.ceil(daysToPredict / 30.0);</span>
+
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        if (lastX != -1) {</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">            for (int i = 1; i &lt;= steps; i++) {</span>
+<span class="fc" id="L314">                double trend = regression.predict((double) lastX + i);</span>
+<span class="fc" id="L315">                double val = trend;</span>
+
+                // Smart Seasonality for Future
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">                if (isDaily) {</span>
+<span class="fc" id="L319">                    LocalDate futureDate = LocalDate.ofEpochDay(lastX + i);</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">                    if (seasonalityIndices.containsKey(futureDate.getDayOfWeek())) {</span>
+<span class="fc" id="L321">                        val *= seasonalityIndices.get(futureDate.getDayOfWeek());</span>
+                    }
+                }
+
+<span class="fc" id="L325">                totalFuturePredicted += Math.max(0, val);</span>
+
+                // Add Future Points to History
+<span class="fc" id="L328">                Map&lt;String, Object&gt; futurePoint = new HashMap&lt;&gt;();</span>
+                String label;
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">                if (isDaily) {</span>
+<span class="fc" id="L331">                    label = LocalDate.ofEpochDay(lastX + i).format(formatter);</span>
+                } else {
+<span class="nc" id="L333">                    long futureMonthIndex = lastX + i;</span>
+<span class="nc" id="L334">                    long year = futureMonthIndex / 12;</span>
+<span class="nc" id="L335">                    long month = futureMonthIndex % 12;</span>
+<span class="nc bnc" id="L336" title="All 2 branches missed.">                    if (month == 0) {</span>
+<span class="nc" id="L337">                        month = 12;</span>
+<span class="nc" id="L338">                        year--;</span>
+                    }
+<span class="nc" id="L340">                    label = String.format(&quot;%d-%02d&quot;, year, month);</span>
+                }
+
+<span class="fc" id="L343">                futurePoint.put(&quot;month&quot;, label);</span>
+                // &quot;real&quot; key allows visualized continuity on frontend graph
+<span class="fc" id="L345">                futurePoint.put(&quot;predicted&quot;, BigDecimal.valueOf(Math.max(0, val)));</span>
+<span class="fc" id="L346">                futurePoint.put(&quot;isPrediction&quot;, true);</span>
+
+<span class="fc" id="L348">                history.add(futurePoint);</span>
+            }
+        }
+
+<span class="fc" id="L352">        result.put(&quot;currentTotal&quot;, currentTotal);</span>
+<span class="fc" id="L353">        result.put(&quot;predictedTotal&quot;, BigDecimal.valueOf(totalFuturePredicted));</span>
+<span class="fc" id="L354">        result.put(&quot;history&quot;, history);</span>
+
+        // Explainability Metrics
+<span class="fc" id="L357">        Map&lt;String, Object&gt; methodology = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L358">        methodology.put(&quot;slope&quot;, regression.getSlope());</span>
+<span class="fc" id="L359">        methodology.put(&quot;seasonality&quot;, seasonalityIndices);</span>
+<span class="fc" id="L360">        result.put(&quot;methodology&quot;, methodology);</span>
+
+<span class="fc" id="L362">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

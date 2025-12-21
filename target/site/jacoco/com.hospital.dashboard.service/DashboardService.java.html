@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DashboardService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">dashboard</a> &gt; <a href="index.source.html" class="el_package">com.hospital.dashboard.service</a> &gt; <span class="el_source">DashboardService.java</span></div><h1>DashboardService.java</h1><pre class="source lang-java linenums">package com.hospital.dashboard.service;
+
+import com.hospital.dashboard.model.*;
+import com.hospital.dashboard.repository.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+<span class="fc" id="L15">public class DashboardService {</span>
+
+        @Autowired
+        private HospitalStayRepository stayRepository;
+        @Autowired
+        private MedicalActRepository medicalActRepository;
+        @Autowired
+        private ConsumableRepository consumableRepository;
+        @Autowired
+        private PersonnelRepository personnelRepository;
+        @Autowired
+        private ForecastServiceV2 forecastService;
+        @Autowired
+        private RevenueService revenueService;
+
+        public Map&lt;String, Object&gt; getDashboardSummary() {
+<span class="fc" id="L31">                Map&lt;String, Object&gt; summary = new HashMap&lt;&gt;();</span>
+
+                // 1. Calculate Totals (Current Month vs Previous Month for Trends)
+<span class="fc" id="L34">                LocalDate now = LocalDate.now();</span>
+<span class="fc" id="L35">                LocalDate startOfMonth = now.minusDays(30); // Rolling 30 days as per UI &quot;30 jours&quot;</span>
+<span class="fc" id="L36">                LocalDate startOfPrevMonth = startOfMonth.minusDays(30);</span>
+<span class="fc" id="L37">                LocalDate endOfPrevMonth = startOfMonth.minusDays(1);</span>
+
+                // Real Cost
+<span class="fc" id="L40">                BigDecimal currentRealCost = calculateTotalRealCost(startOfMonth, now);</span>
+<span class="fc" id="L41">                BigDecimal prevRealCost = calculateTotalRealCost(startOfPrevMonth, endOfPrevMonth);</span>
+<span class="fc" id="L42">                summary.put(&quot;totalRealCost&quot;, currentRealCost);</span>
+<span class="fc" id="L43">                summary.put(&quot;totalRealCostTrend&quot;, calculateTrend(currentRealCost, prevRealCost));</span>
+
+                // Predicted Cost (Real Logic via ForecastServiceV2)
+<span class="fc" id="L46">                Map&lt;String, Object&gt; forecast = forecastService.getGlobalForecast(30);</span>
+<span class="fc" id="L47">                BigDecimal predictedCostRaw = (BigDecimal) forecast.get(&quot;globalPrediction&quot;);</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">                BigDecimal predictedCost = predictedCostRaw != null</span>
+<span class="fc" id="L49">                                ? predictedCostRaw.setScale(2, java.math.RoundingMode.HALF_UP)</span>
+<span class="pc" id="L50">                                : BigDecimal.ZERO;</span>
+
+                // Comparing Predicted (Next 30d) vs Real (Last 30d) for trend
+<span class="fc" id="L53">                summary.put(&quot;totalPredictedCost&quot;, predictedCost);</span>
+<span class="fc" id="L54">                summary.put(&quot;totalPredictedCostTrend&quot;, calculateTrend(predictedCost, currentRealCost));</span>
+
+                // Avg Cost per Stay
+<span class="fc" id="L57">                BigDecimal avgCost = calculateAvgCostPerStay(startOfMonth, now);</span>
+<span class="fc" id="L58">                BigDecimal prevAvgCost = calculateAvgCostPerStay(startOfPrevMonth, endOfPrevMonth);</span>
+<span class="fc" id="L59">                summary.put(&quot;avgCostPerStay&quot;, avgCost);</span>
+<span class="fc" id="L60">                summary.put(&quot;avgCostPerStayTrend&quot;, calculateTrend(avgCost, prevAvgCost));</span>
+
+                // Personnel Ratio
+<span class="fc" id="L63">                double ratio = calculatePersonnelRatio(currentRealCost);</span>
+<span class="fc" id="L64">                double prevRatio = calculatePersonnelRatio(prevRealCost);</span>
+<span class="fc" id="L65">                summary.put(&quot;personnelCostRatio&quot;, ratio);</span>
+<span class="fc" id="L66">                summary.put(&quot;personnelCostRatioTrend&quot;, ratio - prevRatio); // Absolute diff for %</span>
+
+                // 2. Cost by Service (Department)
+<span class="fc" id="L69">                summary.put(&quot;costByService&quot;, calculateCostByService());</span>
+
+                // 3. Cost by Category (New)
+<span class="fc" id="L72">                summary.put(&quot;costByCategory&quot;, calculateCostByCategory(currentRealCost));</span>
+
+                // 4. Recent Stays
+<span class="fc" id="L75">                summary.put(&quot;recentStays&quot;, getRecentStays());</span>
+
+                // 5. Smart Alert
+<span class="fc" id="L78">                summary.put(&quot;smartAlert&quot;, generateSmartAlert(currentRealCost, prevRealCost));</span>
+
+<span class="fc" id="L80">                return summary;</span>
+        }
+
+        private List&lt;Map&lt;String, Object&gt;&gt; calculateCostByCategory(BigDecimal totalCost) {
+<span class="fc" id="L84">                return convertBreakdownToList(getBreakdown(null, null));</span>
+        }
+
+        private List&lt;Map&lt;String, Object&gt;&gt; calculateCostByService() {
+                // Reuse the same breakdown logic, or refine if service-specific logic is needed
+<span class="fc" id="L89">                return convertBreakdownToList(getBreakdown(null, null));</span>
+        }
+
+        private List&lt;Map&lt;String, Object&gt;&gt; convertBreakdownToList(Map&lt;String, BigDecimal&gt; breakdown) {
+<span class="fc" id="L93">                List&lt;Map&lt;String, Object&gt;&gt; list = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L94">                breakdown.forEach((k, v) -&gt; list.add(createCategoryMap(k, v)));</span>
+<span class="fc" id="L95">                return list;</span>
+        }
+
+        private Map&lt;String, Object&gt; createCategoryMap(String name, BigDecimal value) {
+<span class="fc" id="L99">                Map&lt;String, Object&gt; map = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L100">                map.put(&quot;name&quot;, name);</span>
+<span class="fc" id="L101">                map.put(&quot;value&quot;, value);</span>
+<span class="fc" id="L102">                return map;</span>
+        }
+
+        private BigDecimal calculateTotalRealCost(LocalDate start, LocalDate end) {
+<span class="fc" id="L106">                Map&lt;String, BigDecimal&gt; breakdown = getBreakdown(start, end);</span>
+<span class="fc" id="L107">                return breakdown.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+        }
+
+        private BigDecimal calculateAvgCostPerStay(LocalDate start, LocalDate end) {
+                // Optimisation: Reuse calculateTotal for stays
+<span class="fc" id="L112">                List&lt;HospitalStay&gt; stays = stayRepository.findAll();</span>
+<span class="fc" id="L113">                BigDecimal totalCost = calculateTotal(stays,</span>
+<span class="pc bpc" id="L114" title="3 of 6 branches missed.">                                s -&gt; s.getStartDate() != null &amp;&amp; s.getEndDate() != null</span>
+<span class="pc bpc" id="L115" title="1 of 4 branches missed.">                                                &amp;&amp; (start == null || !s.getStartDate().isAfter(end))</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                                                &amp;&amp; (end == null || !s.getEndDate().isBefore(start)),</span>
+<span class="fc" id="L117">                                revenueService::calculateStayRevenue);</span>
+
+<span class="fc" id="L119">                long count = stays.stream()</span>
+<span class="pc bpc" id="L120" title="3 of 6 branches missed.">                                .filter(s -&gt; s.getStartDate() != null &amp;&amp; s.getEndDate() != null</span>
+<span class="pc bpc" id="L121" title="1 of 4 branches missed.">                                                &amp;&amp; (start == null || !s.getStartDate().isAfter(end))</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">                                                &amp;&amp; (end == null || !s.getEndDate().isBefore(start)))</span>
+<span class="fc" id="L123">                                .count();</span>
+
+<span class="fc bfc" id="L125" title="All 2 branches covered.">                if (count == 0)</span>
+<span class="fc" id="L126">                        return BigDecimal.ZERO;</span>
+<span class="fc" id="L127">                return totalCost.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP);</span>
+        }
+
+        private double calculatePersonnelRatio(BigDecimal totalCost) {
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">                if (totalCost.compareTo(BigDecimal.ZERO) == 0)</span>
+<span class="nc" id="L132">                        return 0;</span>
+<span class="fc" id="L133">                BigDecimal personnel = calculateTotal(personnelRepository.findAll(), p -&gt; true,</span>
+                                Personnel::getCostPerDay)
+<span class="fc" id="L135">                                .multiply(BigDecimal.valueOf(30));</span>
+<span class="fc" id="L136">                return personnel.divide(totalCost, 4, RoundingMode.HALF_UP).doubleValue() * 100;</span>
+        }
+
+        private double calculateTrend(BigDecimal current, BigDecimal previous) {
+<span class="fc bfc" id="L140" title="All 2 branches covered.">                if (previous.compareTo(BigDecimal.ZERO) == 0)</span>
+<span class="fc" id="L141">                        return 100.0;</span>
+<span class="fc" id="L142">                return current.subtract(previous).divide(previous, 4, RoundingMode.HALF_UP).doubleValue() * 100;</span>
+        }
+
+        private List&lt;Map&lt;String, Object&gt;&gt; getRecentStays() {
+<span class="fc" id="L146">                return stayRepository.findAll().stream()</span>
+<span class="pc bpc" id="L147" title="2 of 4 branches missed.">                                .filter(s -&gt; s.getStartDate() != null &amp;&amp; s.getEndDate() != null</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                                                &amp;&amp; s.getPatient() != null)</span>
+<span class="pc" id="L149">                                .sorted((s1, s2) -&gt; s2.getStartDate().compareTo(s1.getStartDate()))</span>
+<span class="fc" id="L150">                                .limit(5)</span>
+<span class="fc" id="L151">                                .map(s -&gt; {</span>
+<span class="fc" id="L152">                                        BigDecimal cost = revenueService.calculateStayRevenue(s);</span>
+<span class="fc" id="L153">                                        Map&lt;String, Object&gt; map = new HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">                                        String firstName = s.getPatient().getFirstName() != null</span>
+<span class="fc" id="L155">                                                        ? s.getPatient().getFirstName()</span>
+<span class="pc" id="L156">                                                        : &quot;&quot;;</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">                                        String lastName = s.getPatient().getLastName() != null</span>
+<span class="fc" id="L158">                                                        ? s.getPatient().getLastName()</span>
+<span class="pc" id="L159">                                                        : &quot;&quot;;</span>
+<span class="fc" id="L160">                                        map.put(&quot;patientName&quot;, firstName + &quot; &quot; + lastName);</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                                        map.put(&quot;department&quot;, s.getPathology() != null ? s.getPathology() : &quot;N/A&quot;);</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">                                        map.put(&quot;status&quot;, s.getEndDate().isAfter(LocalDate.now()) ? &quot;En cours&quot;</span>
+<span class="nc" id="L163">                                                        : &quot;Terminé&quot;);</span>
+<span class="fc" id="L164">                                        map.put(&quot;cost&quot;, cost);</span>
+<span class="fc" id="L165">                                        return map;</span>
+                                })
+<span class="fc" id="L167">                                .collect(Collectors.toList());</span>
+        }
+
+        private Map&lt;String, Object&gt; generateSmartAlert(BigDecimal current, BigDecimal prev) {
+<span class="fc" id="L171">                Map&lt;String, Object&gt; alert = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L172">                double trend = calculateTrend(current, prev);</span>
+
+<span class="fc" id="L174">                LocalDate now = LocalDate.now();</span>
+<span class="fc" id="L175">                LocalDate startOfMonth = now.minusDays(30);</span>
+<span class="fc" id="L176">                LocalDate startOfPrev = startOfMonth.minusDays(30);</span>
+<span class="fc" id="L177">                LocalDate endOfPrev = startOfMonth.minusDays(1);</span>
+
+<span class="fc" id="L179">                Map&lt;String, BigDecimal&gt; currentBreakdown = getBreakdown(startOfMonth, now);</span>
+<span class="fc" id="L180">                Map&lt;String, BigDecimal&gt; prevBreakdown = getBreakdown(startOfPrev, endOfPrev);</span>
+
+<span class="fc" id="L182">                String maxDriver = &quot;Général&quot;;</span>
+<span class="fc" id="L183">                BigDecimal maxDelta = BigDecimal.ZERO;</span>
+
+<span class="fc bfc" id="L185" title="All 2 branches covered.">                for (String key : currentBreakdown.keySet()) {</span>
+<span class="fc" id="L186">                        BigDecimal currVal = currentBreakdown.getOrDefault(key, BigDecimal.ZERO);</span>
+<span class="fc" id="L187">                        BigDecimal prevVal = prevBreakdown.getOrDefault(key, BigDecimal.ZERO);</span>
+<span class="fc" id="L188">                        BigDecimal delta = currVal.subtract(prevVal).abs();</span>
+
+<span class="fc bfc" id="L190" title="All 2 branches covered.">                        if (delta.compareTo(maxDelta) &gt; 0) {</span>
+<span class="fc" id="L191">                                maxDelta = delta;</span>
+<span class="fc" id="L192">                                maxDriver = key;</span>
+                        }
+<span class="fc" id="L194">                }</span>
+
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">                if (trend &gt; 5) {</span>
+<span class="fc" id="L197">                        alert.put(&quot;type&quot;, &quot;warning&quot;);</span>
+<span class="fc" id="L198">                        alert.put(&quot;title&quot;, &quot;Alerte de prévision&quot;);</span>
+<span class="fc" id="L199">                        BigDecimal currMaxDriver = currentBreakdown.getOrDefault(maxDriver, BigDecimal.ZERO);</span>
+<span class="fc" id="L200">                        BigDecimal prevMaxDriver = prevBreakdown.getOrDefault(maxDriver, BigDecimal.ZERO);</span>
+<span class="fc" id="L201">                        alert.put(&quot;message&quot;, String.format(</span>
+                                        &quot;Hausse globale de %.1f%%. Le principal facteur est '%s' qui a %s.&quot;,
+<span class="fc" id="L203">                                        trend,</span>
+                                        maxDriver,
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">                                        currMaxDriver.compareTo(prevMaxDriver) &gt; 0</span>
+<span class="fc" id="L206">                                                        ? &quot;augmenté&quot;</span>
+<span class="pc" id="L207">                                                        : &quot;varié&quot;));</span>
+<span class="pc bnc" id="L208" title="All 2 branches missed.">                } else if (trend &lt; -5) {</span>
+<span class="nc" id="L209">                        alert.put(&quot;type&quot;, &quot;success&quot;);</span>
+<span class="nc" id="L210">                        alert.put(&quot;title&quot;, &quot;Optimisation détectée&quot;);</span>
+<span class="nc" id="L211">                        alert.put(&quot;message&quot;, String.format(</span>
+                                        &quot;Baisse des coûts de %.1f%%, principalement grâce à une réduction sur '%s'.&quot;,
+<span class="nc" id="L213">                                        Math.abs(trend),</span>
+                                        maxDriver));
+                } else {
+<span class="nc" id="L216">                        alert.put(&quot;type&quot;, &quot;info&quot;);</span>
+<span class="nc" id="L217">                        alert.put(&quot;title&quot;, &quot;Stabilité&quot;);</span>
+<span class="nc" id="L218">                        alert.put(&quot;message&quot;,</span>
+                                        &quot;Les coûts sont stables. Aucune anomalie majeure détectée sur les postes de dépenses.&quot;);
+                }
+<span class="fc" id="L221">                return alert;</span>
+        }
+
+        private Map&lt;String, BigDecimal&gt; getBreakdown(LocalDate start, LocalDate end) {
+<span class="fc" id="L225">                Map&lt;String, BigDecimal&gt; map = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L227">                BigDecimal acts = calculateTotal(medicalActRepository.findAll(),</span>
+<span class="fc" id="L228">                                a -&gt; isWithinDateRange(a.getDate(), start, end),</span>
+                                MedicalAct::getCost);
+
+<span class="fc" id="L231">                BigDecimal cons = calculateTotal(consumableRepository.findAll(),</span>
+<span class="fc" id="L232">                                c -&gt; isWithinDateRange(c.getDate(), start, end),</span>
+                                Consumable::getTotalCost);
+
+<span class="fc" id="L235">                BigDecimal stays = calculateTotal(stayRepository.findAll(),</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">                                s -&gt; isWithinDateRange(s.getStartDate(), start, end)</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">                                                &amp;&amp; isWithinDateRange(s.getEndDate(), start, end),</span>
+<span class="fc" id="L238">                                revenueService::calculateStayRevenue);</span>
+
+<span class="fc" id="L240">                BigDecimal pers = calculateTotal(personnelRepository.findAll(),</span>
+<span class="fc" id="L241">                                p -&gt; true,</span>
+<span class="fc" id="L242">                                Personnel::getCostPerDay).multiply(BigDecimal.valueOf(30));</span>
+
+<span class="fc" id="L244">                map.put(&quot;Actes Médicaux&quot;, acts);</span>
+<span class="fc" id="L245">                map.put(&quot;Consommables&quot;, cons);</span>
+<span class="fc" id="L246">                map.put(&quot;Séjours&quot;, stays);</span>
+<span class="fc" id="L247">                map.put(&quot;Personnel&quot;, pers);</span>
+
+<span class="fc" id="L249">                return map;</span>
+        }
+
+        private boolean isWithinDateRange(LocalDate date, LocalDate start, LocalDate end) {
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">                if (date == null)</span>
+<span class="nc" id="L254">                        return false;</span>
+<span class="pc bpc" id="L255" title="1 of 4 branches missed.">                if (start == null &amp;&amp; end == null)</span>
+<span class="fc" id="L256">                        return true;</span>
+<span class="pc bpc" id="L257" title="1 of 4 branches missed.">                return !date.isAfter(end) &amp;&amp; !date.isBefore(start);</span>
+        }
+
+        private &lt;T&gt; BigDecimal calculateTotal(List&lt;T&gt; items, java.util.function.Predicate&lt;T&gt; filter,
+                        java.util.function.Function&lt;T, BigDecimal&gt; mapper) {
+<span class="fc" id="L262">                return items.stream()</span>
+<span class="fc" id="L263">                                .filter(filter)</span>
+<span class="fc" id="L264">                                .map(mapper)</span>
+<span class="fc" id="L265">                                .filter(java.util.Objects::nonNull)</span>
+<span class="fc" id="L266">                                .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+        }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

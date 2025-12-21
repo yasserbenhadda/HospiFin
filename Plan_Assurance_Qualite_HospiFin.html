@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plan Assurance Qualité - HospiFin</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+
+        .container {
+            background-color: white;
+            padding: 50px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 20px;
+            margin-bottom: 40px;
+        }
+
+        h2 {
+            color: #2980b9;
+            margin-top: 40px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        h3 {
+            color: #34495e;
+            margin-top: 30px;
+            font-size: 1.3em;
+        }
+
+        h4 {
+            color: #555;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        p,
+        ul,
+        ol {
+            margin-bottom: 15px;
+        }
+
+        ul {
+            list-style-type: disc;
+            padding-left: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 25px 0;
+            font-size: 0.95em;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 12px 15px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+            font-weight: 600;
+            color: #333;
+        }
+
+        tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        .interactive-term {
+            color: #e74c3c;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: underline;
+            text-decoration-style: dotted;
+            padding: 2px 5px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .interactive-term:hover {
+            color: white;
+            background-color: #e74c3c;
+            text-decoration: none;
+        }
+
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 20px 0;
+            padding-left: 15px;
+            background: #f0f7fb;
+            padding: 10px;
+            border-radius: 4px;
+            font-style: italic;
+        }
+
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: Consolas, monospace;
+            color: #c7254e;
+        }
+
+        .toc {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            border: 1px solid #e9ecef;
+            margin-bottom: 30px;
+        }
+
+        .toc ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        .toc>ul>li {
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .toc ul ul {
+            list-style-type: none;
+            padding-left: 20px;
+            margin-top: 5px;
+        }
+
+        .toc ul ul li {
+            font-weight: normal;
+            font-size: 0.95em;
+            margin-bottom: 5px;
+        }
+
+        .toc a {
+            text-decoration: none;
+            color: #2c3e50;
+        }
+
+        .toc a:hover {
+            color: #3498db;
+            text-decoration: underline;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(3px);
+        }
+
+        .modal-content {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            margin: 5% auto;
+            padding: 0;
+            border: 1px solid #444;
+            width: 85%;
+            max-width: 1000px;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            font-family: 'Consolas', 'Monaco', monospace;
+            display: flex;
+            flex-direction: column;
+            max-height: 85vh;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            padding: 15px 20px;
+            background-color: #252526;
+            border-bottom: 1px solid #3e3e42;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-weight: bold;
+            color: #9cdcfe;
+            font-size: 1.1em;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.2s;
+            line-height: 1;
+        }
+
+        .close:hover {
+            color: white;
+        }
+
+        .modal-body {
+            padding: 25px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 14px;
+            line-height: 1.5;
+            tab-size: 4;
+        }
+
+        /* Syntax Highlighting */
+        .keyword {
+            color: #569cd6;
+        }
+
+        .string {
+            color: #ce9178;
+        }
+
+        .comment {
+            color: #6a9955;
+        }
+
+        .annotation {
+            color: #dcdcaa;
+        }
+
+        .type {
+            color: #4ec9b0;
+        }
+
+        .method {
+            color: #dcdcaa;
+        }
+
+        .number {
+            color: #b5cea8;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>PLAN QUALITE ASSURANCE (PQA)</h1>
+        <p style="text-align: center; font-size: 1.2em; margin-bottom: 40px;">
+            <strong>Projet :</strong> Tableau de bord d’anticipation financière des soins hospitaliers (HospiFin)<br>
+            <strong>Réalisé par :</strong> Soufiane Aboualam et Benhadda Yassir
+        </p>
+
+        <h2>Historique des Révisions</h2>
+        <table>
+            <tr>
+                <th>Version</th>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Auteur</th>
+            </tr>
+            <tr>
+                <td>1.0</td>
+                <td>08/12/2025</td>
+                <td>Création initiale du PQA</td>
+                <td>Soufiane A.</td>
+            </tr>
+            <tr>
+                <td>1.1</td>
+                <td>08/12/2025</td>
+                <td>Adaptation technique (React/Spring Boot)</td>
+                <td>Yassir B.</td>
+            </tr>
+        </table>
+
+        <div class="toc">
+            <h3>Table des Matières</h3>
+            <ul>
+                <li><a href="#intro">1. Introduction</a>
+                    <ul>
+                        <li><a href="#objet">1.1 Objet du Document</a></li>
+                        <li><a href="#portee">1.2 Portée du Système</a></li>
+                        <li><a href="#reference">1.3 Documents de Référence</a></li>
+                        <li><a href="#glossaire">1.4 Glossaire et Acronymes</a></li>
+                    </ul>
+                </li>
+                <li><a href="#orga">2. Organisation et Responsabilités</a>
+                    <ul>
+                        <li><a href="#methodo">2.1 Méthodologie de Développement</a></li>
+                        <li><a href="#roles">2.2 Rôles et Responsabilités</a></li>
+                        <li><a href="#raci">2.3 Matrice RACI</a></li>
+                    </ul>
+                </li>
+                <li><a href="#normes">3. Normes et Standards de Développement</a>
+                    <ul>
+                        <li><a href="#backend">3.1 Backend (Spring Boot / Java 17)</a></li>
+                        <li><a href="#frontend">3.2 Frontend (React / JavaScript)</a></li>
+                    </ul>
+                </li>
+                <li><a href="#verif">4. Stratégie de Vérification et Validation</a>
+                    <ul>
+                        <li><a href="#pyramide">4.1 Pyramide des Tests</a></li>
+                        <li><a href="#tu">4.2 Tests Unitaires (TU)</a></li>
+                        <li><a href="#integration">4.3 Tests d’Intégration</a></li>
+                        <li><a href="#securite">4.4 Tests de Sécurité</a></li>
+                    </ul>
+                </li>
+                <li><a href="#config">5. Gestion de Configuration et Environnements</a>
+                    <ul>
+                        <li><a href="#scm">5.1 Gestion de Version (SCM)</a></li>
+                        <li><a href="#tech">5.2 Environnement Technique</a></li>
+                    </ul>
+                </li>
+                <li><a href="#audit">6. Audit de Qualité et Métriques</a>
+                    <ul>
+                        <li><a href="#seuils">6.1 Seuils de Qualité</a></li>
+                        <li><a href="#revue">6.4 Revue de Code</a></li>
+                    </ul>
+                </li>
+                <li><a href="#risques">7. Gestion des Risques</a>
+                    <ul>
+                        <li><a href="#registre">7.3 Registre des Risques</a></li>
+                    </ul>
+                </li>
+                <li><a href="#livrables">8. Livrables</a>
+                    <ul>
+                        <li><a href="#code">8.1 Code Source</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+
+        <hr style="margin: 40px 0; border: 0; border-top: 1px solid #eee;">
+
+        <h2 id="intro">1. Introduction</h2>
+
+        <h3 id="objet">1.1 Objet du Document</h3>
+        <p>Ce document décrit les dispositions prises pour garantir la qualité du logiciel "HospiFin". Il définit les
+            normes, les processus de vérification, et l'organisation mise en place pour assurer la conformité aux
+            exigences fonctionnelles et techniques.</p>
+
+        <h3 id="portee">1.2 Portée du Système</h3>
+        <p>Le système <strong>HospiFin</strong> est une application web de gestion et de prévision financière pour le
+            milieu hospitalier.</p>
+
+        <h4>1.2.1 Backend</h4>
+        <ul>
+            <li><strong>Technologie :</strong> Spring Boot 3 + Java 17</li>
+            <li><strong>Rôle :</strong> Gestion des API REST, logique métier (prévisions, calculs de coûts), persistance
+                des données (JPA/Hibernate), et sécurité.</li>
+        </ul>
+
+        <h4>1.2.2 Frontend</h4>
+        <ul>
+            <li><strong>Technologie :</strong> React.js (Vite) + Material UI</li>
+            <li><strong>Note :</strong> <em>Le plan initial mentionnait Flutter, mais ce projet est implémenté en React
+                    pour une compatibilité web optimale.</em></li>
+            <li><strong>Rôle :</strong> Interface utilisateur responsive, tableaux de bord interactifs (Recharts),
+                gestion de l'état (Hooks/Context).</li>
+        </ul>
+
+        <h4>1.2.3 Infrastructure</h4>
+        <ul>
+            <li><strong>Base de données :</strong> MySQL</li>
+            <li><strong>Serveur :</strong> Tomcat (embarqué Spring Boot)</li>
+            <li><strong>Environnement :</strong> Local (Dev), Potentiellement Dockerisé.</li>
+        </ul>
+
+        <h3 id="reference">1.3 Documents de Référence</h3>
+        <ul>
+            <li>Cahier des Charges (CDC) HospiFin.</li>
+            <li>Documentation de l'API (Swagger/OpenAPI).</li>
+            <li>Maquettes UX/UI (Figma).</li>
+        </ul>
+
+        <h3 id="glossaire">1.4 Glossaire et Acronymes</h3>
+        <ul>
+            <li><strong>PQA :</strong> Plan Qualité Assurance</li>
+            <li><strong>TU :</strong> Test Unitaire</li>
+            <li><strong>TI :</strong> Test d'Intégration</li>
+            <li><strong>PR :</strong> Pull Request</li>
+            <li><strong>CI/CD :</strong> Continuous Integration / Continuous Deployment</li>
+        </ul>
+
+        <hr style="margin: 40px 0; border: 0; border-top: 1px solid #eee;">
+
+        <h2 id="orga">2. Organisation et Responsabilités</h2>
+
+        <h3 id="methodo">2.1 Méthodologie de Développement</h3>
+
+        <h4>2.1.1 Principes Agiles Appliqués</h4>
+        <p>Le projet suit une méthode inspirée de <strong>Scrum</strong> :</p>
+        <ul>
+            <li>Itérations courtes (Sprints de 1-2 semaines).</li>
+            <li>Daily Stand-up (virtuel).</li>
+            <li>Revue de code systématique.</li>
+        </ul>
+
+        <h4>2.1.2 Cycles de Développement</h4>
+        <ol>
+            <li><strong>Planification :</strong> Sélection des User Stories (US).</li>
+            <li><strong>Développement :</strong> Implémentation Backend/Frontend.</li>
+            <li><strong>Tests :</strong> TU, TI et validation visuelle.</li>
+            <li><strong>Revue :</strong> Validation par le pair.</li>
+            <li><strong>Déploiement :</strong> Mise à jour de l'environnement de démo.</li>
+        </ol>
+
+        <h4>2.1.3 Outils de Gestion de Projet</h4>
+        <ul>
+            <li><strong>Suivi des tâches :</strong> Fichier `task.md` / GitHub Projects.</li>
+            <li><strong>Communication :</strong> Discord / Teams.</li>
+            <li><strong>Code :</strong> GitHub.</li>
+        </ul>
+
+        <h3 id="roles">2.2 Rôles et Responsabilités</h3>
+        <p>L'équipe fonctionne en binôme avec une alternance des responsabilités par module pour assurer la polyvalence.
+        </p>
+
+        <table>
+            <tr>
+                <th>Rôle</th>
+                <th>Responsabilités Principales</th>
+            </tr>
+            <tr>
+                <td><strong>Chef de Projet Technique</strong></td>
+                <td>Architecture globale, choix technologiques, arbitrage.</td>
+            </tr>
+            <tr>
+                <td><strong>Lead Backend</strong></td>
+                <td>Architecture API, base de données, algorithmes de prévision.</td>
+            </tr>
+            <tr>
+                <td><strong>Lead Frontend</strong></td>
+                <td>UX/UI, intégration API, composants React.</td>
+            </tr>
+            <tr>
+                <td><strong>Responsable Qualité</strong></td>
+                <td>Stratégie de tests, revue de code, normes.</td>
+            </tr>
+        </table>
+
+        <h3 id="raci">2.3 Matrice RACI</h3>
+        <table>
+            <tr>
+                <th>Tâche / Livrable</th>
+                <th style="text-align:center">Soufiane Aboualam</th>
+                <th style="text-align:center">Benhadda Yassir</th>
+            </tr>
+            <tr>
+                <td>Architecture Initiale</td>
+                <td style="text-align:center">R</td>
+                <td style="text-align:center">A</td>
+            </tr>
+            <tr>
+                <td>Module Authentification (Backend)</td>
+                <td style="text-align:center">R</td>
+                <td style="text-align:center">C</td>
+            </tr>
+            <tr>
+                <td>Module Dashboard (Frontend)</td>
+                <td style="text-align:center">A</td>
+                <td style="text-align:center">R</td>
+            </tr>
+            <tr>
+                <td>Module Prévisions (Algo/Back)</td>
+                <td style="text-align:center">R</td>
+                <td style="text-align:center">I</td>
+            </tr>
+            <tr>
+                <td>Intégration Graphiques (Recharts)</td>
+                <td style="text-align:center">C</td>
+                <td style="text-align:center">R</td>
+            </tr>
+            <tr>
+                <td>Plan Assurance Qualité</td>
+                <td style="text-align:center">R</td>
+                <td style="text-align:center">A</td>
+            </tr>
+            <tr>
+                <td>Déploiement / CI-CD</td>
+                <td style="text-align:center">R</td>
+                <td style="text-align:center">R</td>
+            </tr>
+        </table>
+        <p style="font-size: 0.85em; color: #666;">(R : Réalise, A : Approuve, C : Consulté, I : Informé)</p>
+
+        <hr style="margin: 40px 0; border: 0; border-top: 1px solid #eee;">
+
+        <h2 id="normes">3. Normes et Standards de Développement</h2>
+
+        <h3 id="backend">3.1 Backend (Spring Boot / Java 17)</h3>
+
+        <h4>3.1.1 Architecture en Couches</h4>
+        <blockquote style="text-align: center;">Cliquez sur les termes colorés ci-dessous pour voir le code source réel
+            du projet.</blockquote>
+        <p>Le code respecte strictement l'architecture :</p>
+        <ul>
+            <li><span class="interactive-term" onclick="showCode('Controller')">Controller</span> : Points d'entrée REST
+                (DTO en entrée/sortie).</li>
+            <li><span class="interactive-term" onclick="showCode('Service')">Service</span> : Logique métier
+                transactionnelle.</li>
+            <li><span class="interactive-term" onclick="showCode('Repository')">Repository</span> : Accès aux données
+                (Spring Data JPA).</li>
+            <li><span class="interactive-term" onclick="showCode('Model')">Model</span> : Entités persistantes.</li>
+        </ul>
+
+        <h4>3.1.2 Conventions de Code Java</h4>
+        <ul>
+            <li>Nommage : CamelCase pour méthodes/variables, PascalCase pour classes.</li>
+            <li>Pas de "Magic Numbers" (utiliser des constantes).</li>
+            <li>Gestion des exceptions centralisée (`@ControllerAdvice`).</li>
+        </ul>
+
+        <h4>3.1.3 Utilisation de Lombok</h4>
+        <p>Utilisation intensive de <code>@Data</code>, <code>@Builder</code>, <code>@NoArgsConstructor</code> pour
+            réduire le boilerplate.</p>
+
+        <h4>3.1.4 Pattern DTO</h4>
+        <p>Aucune entité JPA ne doit être exposée directement dans le contrôleur. Utilisation de mappers pour convertir
+            Entité <-> DTO.</p>
+
+        <h3 id="frontend">3.2 Frontend (React / JavaScript)</h3>
+
+        <h4>3.2.1 Architecture Modulaire</h4>
+        <ul>
+            <li><code>/components</code> : Composants réutilisables (Boutons, Cards, Layout).</li>
+            <li><code>/pages</code> : Vues principales (Dashboard, Patients, etc.).</li>
+            <li><code>/services</code> : Appels API (Axios).</li>
+        </ul>
+
+        <h4>3.2.2 Gestion d’État</h4>
+        <p>État local (<code>useState</code>) et <code>useEffect</code> pour les effets de bord (appels API).</p>
+
+        <h4>3.2.3 Qualité du Code JS/JSX</h4>
+        <ul>
+            <li>Utilisation de <strong>ES6+</strong> (Arrow functions, Destructuring).</li>
+            <li>Nommage explicite des props.</li>
+            <li>Pas de <code>console.log</code> en production.</li>
+        </ul>
+
+        <hr style="margin: 40px 0; border: 0; border-top: 1px solid #eee;">
+
+        <h2 id="verif">4. Stratégie de Vérification et Validation</h2>
+
+        <h3 id="pyramide">4.1 Pyramide des Tests</h3>
+        <p>Priorité aux tests unitaires rapides, suivis des tests d'intégration.</p>
+
+        <h3 id="tu">4.2 Tests Unitaires (TU)</h3>
+        <ul>
+            <li><strong>Backend :</strong> JUnit 5 & Mockito. Couverture cible > 70% sur la couche Service. Mock
+                systématique des Repositories.</li>
+            <li><strong>Frontend :</strong> Vitest / Jest (équivalent Tests Flutter mentionné initialement).</li>
+        </ul>
+
+        <h3 id="integration">4.3 Tests d’Intégration</h3>
+        <ul>
+            <li><strong>Tests API :</strong> Validation des codes retour HTTP (200, 400, 404, 500) et structure JSON.
+            </li>
+            <li><strong>Tests IA :</strong> Vérification que l'algorithme de prévision renvoie des données cohérentes.
+            </li>
+        </ul>
+
+        <h3 id="securite">4.4 Tests de Sécurité</h3>
+        <ul>
+            <li>Validation de l’Authentification (accès aux routes protégées).</li>
+            <li>Protection contre les injections SQL (JPA) et XSS.</li>
+        </ul>
+
+        <hr style="margin: 40px 0; border: 0; border-top: 1px solid #eee;">
+
+        <h2 id="config">5. Gestion de Configuration et Environnements</h2>
+
+        <h3 id="scm">5.1 Gestion de Version (SCM)</h3>
+        <ul>
+            <li><strong>Outil :</strong> Git sur GitHub.</li>
+            <li><strong>Branches :</strong> <code>main</code> (stable), <code>develop</code>, <code>feature/*</code>.
+            </li>
+            <li><strong>Commits :</strong> <code>[TYPE] Description</code> (FEAT, FIX, DOC, REFACTOR).</li>
+        </ul>
+
+        <h3 id="tech">5.2 Environnement Technique</h3>
+        <ul>
+            <li><strong>Backend :</strong> Dockerfile (Java 17).</li>
+            <li><strong>Frontend :</strong> Dockerfile (Nginx/Node).</li>
+            <li><strong>Orchestration :</strong> docker-compose.yml.</li>
+        </ul>
+
+        <hr style="margin: 40px 0; border: 0; border-top: 1px solid #eee;">
+
+        <h2 id="audit">6. Audit de Qualité et Métriques</h2>
+
+        <h3 id="seuils">6.1 Seuils de Qualité (Quality Gates)</h3>
+        <ul>
+            <li>Pas de vulnérabilités bloquantes.</li>
+            <li>Pas de bugs majeurs.</li>
+            <li>Duplication de code < 5%.</li>
+        </ul>
+
+        <h3 id="revue">6.4 Revue de Code</h3>
+        <p>Toute fusion vers <code>main</code> doit être précédée d'une PR validée. Checklist : Compilation OK ? Tests
+            OK ? Nommage clair ?</p>
+
+        <hr style="margin: 40px 0; border: 0; border-top: 1px solid #eee;">
+
+        <h2 id="risques">7. Gestion des Risques</h2>
+
+        <h3 id="registre">7.3 Registre des Risques</h3>
+        <table>
+            <tr>
+                <th>ID</th>
+                <th>Risque</th>
+                <th>Prob.</th>
+                <th>Impact</th>
+                <th>Stratégie d'Atténuation</th>
+            </tr>
+            <tr>
+                <td>R01</td>
+                <td>Incohérence des données de prévision</td>
+                <td>Moyen</td>
+                <td>Fort</td>
+                <td>Tests unitaires poussés sur ForecastService.</td>
+            </tr>
+            <tr>
+                <td>R02</td>
+                <td>Problèmes de performance</td>
+                <td>Faible</td>
+                <td>Moyen</td>
+                <td>Indexation BDD, Pagination.</td>
+            </tr>
+            <tr>
+                <td>R03</td>
+                <td>Retard sur le planning</td>
+                <td>Moyen</td>
+                <td>Fort</td>
+                <td>Priorisation (MoSCoW).</td>
+            </tr>
+            <tr>
+                <td>R04</td>
+                <td>Perte de code</td>
+                <td>Faible</td>
+                <td>Très Fort</td>
+                <td>Push réguliers sur GitHub.</td>
+            </tr>
+        </table>
+
+        <hr style="margin: 40px 0; border: 0; border-top: 1px solid #eee;">
+
+        <h2 id="livrables">8. Livrables</h2>
+        <h3 id="code">8.1 Code Source</h3>
+        <p>L'ensemble du code source est livré via le dépôt GitHub, comprenant :</p>
+        <ul>
+            <li>Le code Backend <code>src/main</code>.</li>
+            <li>Le code Frontend <code>src/</code>.</li>
+            <li>Les fichiers de configuration (application.properties, package.json).</li>
+            <li>La documentation technique et ce PQA.</li>
+        </ul>
+
+        <div
+            style="margin-top: 60px; padding: 20px; background-color: #eef2f5; border-radius: 8px; text-align: center; color: #555;">
+            <p><strong>Répartition Finale des Tâches :</strong></p>
+            <p>Soufiane A. (Backend Core, PQA 1-3) | Yassir B. (Frontend, CI/CD, PQA 4-8)</p>
+            <p style="margin-top: 10px; font-size: 0.9em;">© 2025 HospiFin - Document Confidentiel</p>
+        </div>
+    </div>
+
+    <!-- Modal Structure -->
+    <div id="codeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="modalTitle" class="modal-title">Code Source</span>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <div id="modalBody" class="modal-body"></div>
+        </div>
+    </div>
+
+    <script>
+        // Embedded Code Data
+        const codeData = {
+            'Controller': `
+<span class="keyword">package</span> com.hospital.dashboard.controller;
+
+<span class="keyword">import</span> com.hospital.dashboard.model.Patient;
+<span class="keyword">import</span> com.hospital.dashboard.repository.PatientRepository;
+<span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;
+<span class="keyword">import</span> org.springframework.web.bind.annotation.*;
+
+<span class="keyword">import</span> java.util.List;
+
+<span class="annotation">@RestController</span>
+<span class="annotation">@RequestMapping</span>(<span class="string">"/api/patients"</span>)
+<span class="annotation">@CrossOrigin</span>(origins = <span class="string">"http://localhost:5173"</span>)
+<span class="keyword">public class</span> <span class="type">PatientController</span> {
+
+    <span class="annotation">@Autowired</span>
+    <span class="keyword">private</span> <span class="type">PatientRepository</span> patientRepository;
+
+    <span class="annotation">@GetMapping</span>
+    <span class="keyword">public</span> List&lt;<span class="type">Patient</span>&gt; <span class="method">getAllPatients</span>() {
+        <span class="keyword">return</span> patientRepository.findAll();
+    }
+
+    <span class="annotation">@PostMapping</span>
+    <span class="keyword">public</span> <span class="type">Patient</span> <span class="method">createPatient</span>(<span class="annotation">@RequestBody</span> <span class="type">Patient</span> patient) {
+        <span class="keyword">return</span> patientRepository.save(patient);
+    }
+
+    <span class="annotation">@GetMapping</span>(<span class="string">"/{id}"</span>)
+    <span class="keyword">public</span> <span class="type">Patient</span> <span class="method">getPatient</span>(<span class="annotation">@PathVariable</span> Long id) {
+        <span class="keyword">return</span> patientRepository.findById(id).orElse(<span class="keyword">null</span>);
+    }
+}`,
+            'Service': `
+<span class="keyword">package</span> com.hospital.dashboard.service;
+
+<span class="keyword">import</span> com.hospital.dashboard.model.*;
+<span class="keyword">import</span> com.hospital.dashboard.repository.*;
+<span class="keyword">import</span> org.springframework.beans.factory.annotation.Autowired;
+<span class="keyword">import</span> org.springframework.stereotype.Service;
+<span class="keyword">import</span> java.time.LocalDate;
+<span class="keyword">import</span> java.util.List;
+
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="type">DashboardService</span> {
+
+    <span class="annotation">@Autowired</span>
+    <span class="keyword">private</span> <span class="type">HospitalStayRepository</span> stayRepository;
+
+    <span class="comment">// Calculates total real cost based on hospital stays</span>
+    <span class="keyword">public</span> <span class="type">BigDecimal</span> <span class="method">calculateTotalRealCost</span>(<span class="type">LocalDate</span> start, <span class="type">LocalDate</span> end) {
+        <span class="keyword">return</span> stayRepository.findAll().stream()
+                .filter(s -> !s.getStartDate().isAfter(end))
+                .map(s -> s.getDailyRate())
+                .reduce(<span class="type">BigDecimal</span>.ZERO, <span class="type">BigDecimal</span>::add);
+    }
+}`,
+            'Repository': `
+<span class="keyword">package</span> com.hospital.dashboard.repository;
+
+<span class="keyword">import</span> com.hospital.dashboard.model.Patient;
+<span class="keyword">import</span> org.springframework.data.jpa.repository.JpaRepository;
+<span class="keyword">import</span> org.springframework.stereotype.Repository;
+
+<span class="annotation">@Repository</span>
+<span class="keyword">public interface</span> <span class="type">PatientRepository</span> <span class="keyword">extends</span> <span class="type">JpaRepository</span>&lt;<span class="type">Patient</span>, Long&gt; {
+    <span class="comment">// Spring Data JPA automatically provides CRUD methods</span>
+    <span class="comment">// save, findById, findAll, deleteById, count, etc.</span>
+}`,
+            'Model': `
+<span class="keyword">package</span> com.hospital.dashboard.model;
+
+<span class="keyword">import</span> jakarta.persistence.*;
+<span class="keyword">import</span> lombok.Data;
+<span class="keyword">import</span> lombok.NoArgsConstructor;
+<span class="keyword">import</span> lombok.AllArgsConstructor;
+<span class="keyword">import</span> java.time.LocalDate;
+
+<span class="annotation">@Entity</span>
+<span class="annotation">@Data</span>
+<span class="annotation">@NoArgsConstructor</span>
+<span class="annotation">@AllArgsConstructor</span>
+<span class="keyword">public class</span> <span class="type">Patient</span> {
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = <span class="type">GenerationType</span>.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String firstName;
+    <span class="keyword">private</span> String lastName;
+    <span class="keyword">private</span> String ssn;
+    <span class="keyword">private</span> <span class="type">LocalDate</span> birthDate;
+}`
+        };
+
+        function showCode(type) {
+            const modal = document.getElementById("codeModal");
+            const body = document.getElementById("modalBody");
+            const title = document.getElementById("modalTitle");
+
+            title.innerText = "Code Source : " + type + ".java";
+            body.innerHTML = codeData[type] || "// Code non disponible";
+            modal.style.display = "block";
+        }
+
+        function closeModal() {
+            const modal = document.getElementById("codeModal");
+            modal.style.animation = "fadeOut 0.2s";
+            setTimeout(() => {
+                modal.style.display = "none";
+                modal.style.animation = "";
+            }, 190);
+        }
+
+        window.onclick = function (event) {
+            const modal = document.getElementById("codeModal");
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+    </script>
+
+</body>
+
+</html>

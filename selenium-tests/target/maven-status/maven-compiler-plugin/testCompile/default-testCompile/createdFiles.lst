@@ -1,0 +1,10 @@
+com\hospital\pages\PatientsPage.class
+com\hospital\tests\BaseTest.class
+com\hospital\tests\HospitalDashboardTests.class
+com\hospital\pages\PersonnelPage.class
+com\hospital\pages\BasePage.class
+com\hospital\pages\SettingsPage.class
+com\hospital\pages\MedicalActsPage.class
+com\hospital\pages\ChatAssistantPage.class
+com\hospital\pages\LayoutPage.class
+com\hospital\pages\DashboardPage.class

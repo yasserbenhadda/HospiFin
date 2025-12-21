@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ChatService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">dashboard</a> &gt; <a href="index.source.html" class="el_package">com.hospital.dashboard.service</a> &gt; <span class="el_source">ChatService.java</span></div><h1>ChatService.java</h1><pre class="source lang-java linenums">package com.hospital.dashboard.service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.math.BigDecimal;
+import java.util.*;
+
+@Service
+<span class="fc" id="L15">public class ChatService {</span>
+
+<span class="fc" id="L17">    private static final Logger logger = LoggerFactory.getLogger(ChatService.class);</span>
+
+    @Autowired
+    private ForecastServiceV2 forecastService;
+
+    @Value(&quot;${langchain4j.open-ai.chat-model.api-key}&quot;)
+    private String apiKey;
+
+    @Value(&quot;${langchain4j.open-ai.chat-model.base-url:https://api.openai.com/v1}&quot;)
+    private String baseUrl;
+
+    @Value(&quot;${langchain4j.open-ai.chat-model.model-name:gpt-4o-mini}&quot;)
+    private String modelName;
+
+    private static final String SYSTEM_PROMPT = &quot;&quot;&quot;
+            Tu es un assistant IA expert et consultant en finance hospitalière pour HospiFin.
+
+            Ton rôle est DOUBLE :
+            1. **Analyste de Données** : Répondre aux questions sur les chiffres et prévisions du tableau de bord.
+            2. **Consultant Stratégique** : Donner des conseils PRATIQUES et INTELLIGENTS pour réduire les coûts et optimiser le budget.
+
+            PERIMÈTRE D'ACTION :
+            - Tu DOIS répondre aux questions sur : &quot;Comment réduire les coûts ?&quot;, &quot;Optimiser le budget&quot;, &quot;Analyse des tendances&quot;, &quot;Pourquoi les coûts augmentent ?&quot;.
+            - Tu DOIS REFUSER uniquement les sujets totalement hors contexte (Météo, Football, Cuisine, Code Java général, etc.).
+
+            INSTRUCTIONS SPÉCIALES &quot;COMMENT C'EST CALCULÉ ?&quot; :
+            Si l'utilisateur demande &quot;Comment as-tu prédit ça ?&quot; ou &quot;Détails du calcul&quot; :
+            1. Cite l'algorithme : &quot;Régression Linéaire avec Ajustement Saisonnier&quot;.
+            2. Donne la PENTE (Trend) : &quot;J'ai détecté une tendance de X €/jour&quot;.
+            3. Explique la SAISONNALITÉ : &quot;Le Lundi est historiquement 1.2x plus cher, le Dimanche 0.8x...&quot;.
+            4. Sois technique et pédagogue. Montre que tu as analysé les chiffres.
+
+            BASE DE CONNAISSANCES (Stratégies d'optimisation) :
+            - **Personnel** : Suggérer l'ajustement des plannings selon la saisonnalité, réduire les heures sup non critiques.
+            - **Consommables** : Négocier les achats en volume, contrôler les stocks périmés, privilégier les génériques.
+            - **Séjours** : Réduire la DMS (Durée Moyenne de Séjour) par une meilleure planification des sorties, éviter les réadmissions.
+            - **Actes** : Auditer la rentabilité des blocs opératoires, optimiser le taux d'occupation.
+
+            STYLE DE RÉPONSE :
+            - Sois proactif et force de proposition. Ne dis JAMAIS &quot;Je ne peux pas donner d'idées générales&quot; si le sujet est la finance.
+            - Utilise les DONNÉES DE CONTEXTE ci-dessous pour personnaliser tes conseils (ex: &quot;Vu que vos coûts prévus augmentent ce week-end, je suggère de...&quot;).
+            - Réponds aux salutations (&quot;Bonjour&quot;, &quot;Hi&quot;) poliment.
+            &quot;&quot;&quot;;
+
+<span class="fc" id="L61">    private RestTemplate restTemplate = new RestTemplate();</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public String chat(String userMessage) {
+        // 1. Fetch Real-time Context
+<span class="fc" id="L66">        String contextData = getFinancialContext();</span>
+
+<span class="fc" id="L68">        String url = baseUrl + &quot;/chat/completions&quot;;</span>
+
+<span class="fc" id="L70">        HttpHeaders headers = new HttpHeaders();</span>
+<span class="fc" id="L71">        headers.setContentType(MediaType.APPLICATION_JSON);</span>
+<span class="fc" id="L72">        headers.set(&quot;Authorization&quot;, &quot;Bearer &quot; + apiKey);</span>
+<span class="fc" id="L73">        headers.set(&quot;HTTP-Referer&quot;, &quot;http://localhost:5173&quot;);</span>
+<span class="fc" id="L74">        headers.set(&quot;X-Title&quot;, &quot;HospiFin Dashboard&quot;);</span>
+
+<span class="fc" id="L76">        Map&lt;String, Object&gt; requestBody = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L77">        requestBody.put(&quot;model&quot;, modelName);</span>
+<span class="fc" id="L78">        requestBody.put(&quot;messages&quot;, List.of(</span>
+<span class="fc" id="L79">                Map.of(&quot;role&quot;, &quot;system&quot;, &quot;content&quot;,</span>
+                        SYSTEM_PROMPT + &quot;\n\n=== DONNÉES TEMPS RÉEL (CONTEXTE) ===\n&quot; + contextData),
+<span class="fc" id="L81">                Map.of(&quot;role&quot;, &quot;user&quot;, &quot;content&quot;, userMessage)));</span>
+
+<span class="fc" id="L83">        HttpEntity&lt;Map&lt;String, Object&gt;&gt; entity = new HttpEntity&lt;&gt;(requestBody, headers);</span>
+
+        try {
+<span class="fc" id="L86">            ResponseEntity&lt;Map&gt; response = restTemplate.exchange(url, HttpMethod.POST, entity, Map.class);</span>
+<span class="fc" id="L87">            Map&lt;String, Object&gt; body = response.getBody();</span>
+
+<span class="pc bpc" id="L89" title="2 of 4 branches missed.">            if (body != null &amp;&amp; body.containsKey(&quot;choices&quot;)) {</span>
+<span class="fc" id="L90">                Object choicesRaw = body.get(&quot;choices&quot;);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">                if (choicesRaw instanceof List) {</span>
+                    @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L93">                    List&lt;Map&lt;String, Object&gt;&gt; choices = (List&lt;Map&lt;String, Object&gt;&gt;) choicesRaw;</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">                    if (!choices.isEmpty()) {</span>
+<span class="fc" id="L95">                        Object messageRaw = choices.get(0).get(&quot;message&quot;);</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">                        if (messageRaw instanceof Map) {</span>
+                            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L98">                            Map&lt;String, Object&gt; message = (Map&lt;String, Object&gt;) messageRaw;</span>
+<span class="fc" id="L99">                            Object content = message.get(&quot;content&quot;);</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">                            if (content != null) {</span>
+<span class="fc" id="L101">                                return content.toString();</span>
+                            }
+                        }
+                    }
+                }
+            }
+<span class="nc" id="L107">            return &quot;Désolé, je n'ai pas pu générer une réponse.&quot;;</span>
+<span class="fc" id="L108">        } catch (Exception e) {</span>
+<span class="fc" id="L109">            logger.error(&quot;Error connecting to AI service&quot;, e);</span>
+<span class="fc" id="L110">            return &quot;Erreur de connexion au service IA: &quot; + e.getMessage();</span>
+        }
+    }
+
+    private String getFinancialContext() {
+        try {
+            // Predict for next 7 days to give context
+<span class="fc" id="L117">            Map&lt;String, Object&gt; forecast = forecastService.getGlobalForecast(7);</span>
+
+<span class="fc" id="L119">            BigDecimal currentTotal = (BigDecimal) forecast.get(&quot;globalTotal&quot;);</span>
+<span class="fc" id="L120">            BigDecimal predictedTotal7Days = (BigDecimal) forecast.get(&quot;globalPrediction&quot;);</span>
+
+<span class="fc" id="L122">            StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L123">            sb.append(String.format(&quot;- Total des coûts ACTUELS (historique): %.2f €\n&quot;, currentTotal));</span>
+<span class="fc" id="L124">            sb.append(String.format(&quot;- Prévision Total sur 7 jours: %.2f €\n&quot;, predictedTotal7Days));</span>
+
+<span class="fc" id="L126">            List&lt;Map&lt;String, Object&gt;&gt; history = (List&lt;Map&lt;String, Object&gt;&gt;) forecast.get(&quot;history&quot;);</span>
+
+            // Extract Methodology (Medical Acts as proxy for global trend)
+<span class="fc" id="L129">            Map&lt;String, Object&gt; medicalActs = (Map&lt;String, Object&gt;) forecast.get(&quot;medicalActs&quot;);</span>
+<span class="pc bpc" id="L130" title="1 of 4 branches missed.">            if (medicalActs != null &amp;&amp; medicalActs.containsKey(&quot;methodology&quot;)) {</span>
+<span class="fc" id="L131">                Map&lt;String, Object&gt; method = (Map&lt;String, Object&gt;) medicalActs.get(&quot;methodology&quot;);</span>
+<span class="fc" id="L132">                Double slope = (Double) method.get(&quot;slope&quot;);</span>
+<span class="fc" id="L133">                Map&lt;java.time.DayOfWeek, Double&gt; seasonality = (Map&lt;java.time.DayOfWeek, Double&gt;) method</span>
+<span class="fc" id="L134">                        .get(&quot;seasonality&quot;);</span>
+
+<span class="fc" id="L136">                sb.append(&quot;\n=== MÉTHODOLOGIE PRÉDICTIVE (Détails Techniques) ===\n&quot;);</span>
+<span class="fc" id="L137">                sb.append(String.format(&quot;- Algorithme: Régression Linéaire Simple + Ajustement Saisonnier\n&quot;));</span>
+<span class="fc" id="L138">                sb.append(String.format(&quot;- Tendance détectée (Pente): %.2f € / jour\n&quot;, slope));</span>
+<span class="pc bpc" id="L139" title="2 of 4 branches missed.">                if (seasonality != null &amp;&amp; !seasonality.isEmpty()) {</span>
+<span class="fc" id="L140">                    sb.append(&quot;- Saisonnalité (Facteurs multiplicateurs &gt;1 = Coût élevé, &lt;1 = Coût faible):\n&quot;);</span>
+<span class="fc" id="L141">                    seasonality.forEach((day, val) -&gt; {</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                        if (Math.abs(val - 1.0) &gt; 0.05) { // Only show significant deviations</span>
+<span class="fc" id="L143">                            sb.append(String.format(&quot;  * %s : %.2fx\n&quot;, day, val));</span>
+                        }
+<span class="fc" id="L145">                    });</span>
+                }
+            }
+
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            if (history != null) {</span>
+<span class="fc" id="L150">                sb.append(&quot;\n- Détail Prévisions (4 prochains jours):\n&quot;);</span>
+                // Filter for future predictions only (items with &quot;isPrediction&quot; or just ensure
+                // they are future dates)
+                // In getGlobalForecast, future items have &quot;isPrediction&quot;: true
+<span class="fc" id="L154">                history.stream()</span>
+<span class="fc" id="L155">                        .filter(m -&gt; Boolean.TRUE.equals(m.get(&quot;isPrediction&quot;)))</span>
+<span class="fc" id="L156">                        .limit(4)</span>
+<span class="fc" id="L157">                        .forEach(m -&gt; {</span>
+<span class="fc" id="L158">                            BigDecimal val = (BigDecimal) m.get(&quot;predicted&quot;);</span>
+<span class="fc" id="L159">                            sb.append(String.format(&quot;  * %s : %.2f €\n&quot;, m.get(&quot;month&quot;), val));</span>
+<span class="fc" id="L160">                        });</span>
+            }
+<span class="fc" id="L162">            return sb.toString();</span>
+<span class="nc" id="L163">        } catch (Exception e) {</span>
+<span class="nc" id="L164">            return &quot;Données financières indisponibles pour le moment.&quot;;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
