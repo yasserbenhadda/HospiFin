@@ -10,6 +10,7 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog';
 import stayService from '../services/stayService';
 import patientService from '../services/patientService';
 
@@ -73,15 +74,31 @@ const Stays = () => {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (window.confirm("Êtes-vous sûr de vouloir supprimer ce séjour ?")) {
+    // Delete Dialog Handling
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [stayToDelete, setStayToDelete] = useState(null);
+
+    const handleDeleteClick = (stay) => {
+        setStayToDelete(stay);
+        setDeleteDialogOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (stayToDelete) {
             try {
-                await stayService.deleteStay(id);
+                await stayService.deleteStay(stayToDelete.id);
                 fetchStays();
             } catch (error) {
                 console.error("Error deleting stay:", error);
             }
         }
+        setDeleteDialogOpen(false);
+        setStayToDelete(null);
+    };
+
+    const handleCancelDelete = () => {
+        setDeleteDialogOpen(false);
+        setStayToDelete(null);
     };
 
     const filteredStays = stays.filter(stay =>
@@ -149,7 +166,7 @@ const Stays = () => {
                                 <TableCell align="right">
                                     <Stack direction="row" spacing={1} justifyContent="flex-end">
                                         <IconButton size="small" onClick={() => handleOpen(stay)} sx={{ color: 'primary.main', bgcolor: '#EFF6FF', borderRadius: 1 }}><EditIcon fontSize="small" /></IconButton>
-                                        <IconButton size="small" onClick={() => handleDelete(stay.id)} sx={{ color: 'error.main', bgcolor: '#FEF2F2', borderRadius: 1 }}><DeleteOutlineIcon fontSize="small" /></IconButton>
+                                        <IconButton size="small" onClick={() => handleDeleteClick(stay)} sx={{ color: 'error.main', bgcolor: '#FEF2F2', borderRadius: 1 }}><DeleteOutlineIcon fontSize="small" /></IconButton>
                                     </Stack>
                                 </TableCell>
                             </TableRow>
@@ -217,6 +234,12 @@ const Stays = () => {
                     <Button onClick={handleSave} variant="contained">Enregistrer</Button>
                 </DialogActions>
             </Dialog>
+            <DeleteConfirmationDialog
+                open={deleteDialogOpen}
+                onClose={handleCancelDelete}
+                onConfirm={handleConfirmDelete}
+                itemName={stayToDelete ? `Séjour de ${stayToDelete.patient ? stayToDelete.patient.lastName : '...'}` : null}
+            />
         </Box>
     );
 };

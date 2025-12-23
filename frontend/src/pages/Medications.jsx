@@ -11,6 +11,7 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog';
 import medicationService from '../services/medicationService';
 
 const Medications = () => {
@@ -62,15 +63,31 @@ const Medications = () => {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (window.confirm("Êtes-vous sûr de vouloir supprimer ce médicament ?")) {
+    // Delete Dialog Handling
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [medicationToDelete, setMedicationToDelete] = useState(null);
+
+    const handleDeleteClick = (medication) => {
+        setMedicationToDelete(medication);
+        setDeleteDialogOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (medicationToDelete) {
             try {
-                await medicationService.deleteMedication(id);
+                await medicationService.deleteMedication(medicationToDelete.id);
                 fetchMedications();
             } catch (error) {
                 console.error("Error deleting medication:", error);
             }
         }
+        setDeleteDialogOpen(false);
+        setMedicationToDelete(null);
+    };
+
+    const handleCancelDelete = () => {
+        setDeleteDialogOpen(false);
+        setMedicationToDelete(null);
     };
 
     const filteredMedications = medications.filter(med =>
@@ -146,7 +163,7 @@ const Medications = () => {
                                     <Stack direction="row" spacing={1} justifyContent="flex-end">
                                         <IconButton size="small" sx={{ color: 'text.secondary' }}><VisibilityIcon fontSize="small" /></IconButton>
                                         <IconButton size="small" onClick={() => handleOpen(med)} sx={{ color: 'primary.main', bgcolor: '#EFF6FF', borderRadius: 1 }}><EditIcon fontSize="small" /></IconButton>
-                                        <IconButton size="small" onClick={() => handleDelete(med.id)} sx={{ color: 'error.main', bgcolor: '#FEF2F2', borderRadius: 1 }}><DeleteOutlineIcon fontSize="small" /></IconButton>
+                                        <IconButton size="small" onClick={() => handleDeleteClick(med)} sx={{ color: 'error.main', bgcolor: '#FEF2F2', borderRadius: 1 }}><DeleteOutlineIcon fontSize="small" /></IconButton>
                                     </Stack>
                                 </TableCell>
                             </TableRow>
@@ -202,6 +219,12 @@ const Medications = () => {
                     <Button onClick={handleSave} variant="contained">Enregistrer</Button>
                 </DialogActions>
             </Dialog>
+            <DeleteConfirmationDialog
+                open={deleteDialogOpen}
+                onClose={handleCancelDelete}
+                onConfirm={handleConfirmDelete}
+                itemName={medicationToDelete ? medicationToDelete.name : null}
+            />
         </Box>
     );
 };

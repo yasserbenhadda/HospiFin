@@ -1,0 +1,53 @@
+@startuml
+class Patient {
+    +Long id
+    +String firstName
+    +String lastName
+    +String ssn
+    +LocalDate birthDate
+}
+
+class HospitalStay {
+    +Long id
+    +LocalDate startDate
+    +LocalDate endDate
+    +BigDecimal dailyRate
+    +String pathology
+}
+
+class MedicalAct {
+    +Long id
+    +String type
+    +BigDecimal cost
+    +LocalDate date
+    +String practitionerId
+}
+
+class Consumable {
+    +Long id
+    +String name
+    +BigDecimal unitPrice
+    +int quantity
+    +LocalDate date
+}
+
+class Personnel {
+    +Long id
+    +String firstName
+    +String lastName
+    +String role
+    +BigDecimal salary
+    +String service
+}
+
+class ForecastServiceV2 {
+    +getGlobalForecast(int days)
+    -predictMedicalActsCosts()
+    -predictConsumablesCosts()
+    -predictStaysCosts()
+}
+
+Patient "1" *-- "0..*" HospitalStay : has >
+Patient "1" *-- "0..*" MedicalAct : receives >
+Patient "1" *-- "0..*" Consumable : uses >
+@enduml

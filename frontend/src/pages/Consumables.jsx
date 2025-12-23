@@ -11,6 +11,7 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog';
 import consumableService from '../services/consumableService';
 import medicationService from '../services/medicationService';
 import patientService from '../services/patientService';
@@ -86,15 +87,31 @@ const Consumables = () => {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (window.confirm("Êtes-vous sûr de vouloir supprimer cette consommation ?")) {
+    // Delete Dialog Handling
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [consumableToDelete, setConsumableToDelete] = useState(null);
+
+    const handleDeleteClick = (consumable) => {
+        setConsumableToDelete(consumable);
+        setDeleteDialogOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (consumableToDelete) {
             try {
-                await consumableService.deleteConsumable(id);
+                await consumableService.deleteConsumable(consumableToDelete.id);
                 fetchConsumables();
             } catch (error) {
                 console.error("Error deleting consumable:", error);
             }
         }
+        setDeleteDialogOpen(false);
+        setConsumableToDelete(null);
+    };
+
+    const handleCancelDelete = () => {
+        setDeleteDialogOpen(false);
+        setConsumableToDelete(null);
     };
 
     const filteredConsumables = consumables.filter(item =>
@@ -163,7 +180,7 @@ const Consumables = () => {
                                     <Stack direction="row" spacing={1} justifyContent="flex-end">
                                         <IconButton size="small" sx={{ color: 'text.secondary' }}><VisibilityIcon fontSize="small" /></IconButton>
                                         <IconButton size="small" onClick={() => handleOpen(item)} sx={{ color: 'primary.main', bgcolor: '#EFF6FF', borderRadius: 1 }}><EditIcon fontSize="small" /></IconButton>
-                                        <IconButton size="small" onClick={() => handleDelete(item.id)} sx={{ color: 'error.main', bgcolor: '#FEF2F2', borderRadius: 1 }}><DeleteOutlineIcon fontSize="small" /></IconButton>
+                                        <IconButton size="small" onClick={() => handleDeleteClick(item)} sx={{ color: 'error.main', bgcolor: '#FEF2F2', borderRadius: 1 }}><DeleteOutlineIcon fontSize="small" /></IconButton>
                                     </Stack>
                                 </TableCell>
                             </TableRow>
@@ -240,6 +257,12 @@ const Consumables = () => {
                     <Button onClick={handleSave} variant="contained">Enregistrer</Button>
                 </DialogActions>
             </Dialog>
+            <DeleteConfirmationDialog
+                open={deleteDialogOpen}
+                onClose={handleCancelDelete}
+                onConfirm={handleConfirmDelete}
+                itemName={consumableToDelete ? `Consommation #${consumableToDelete.id}` : null}
+            />
         </Box>
     );
 };

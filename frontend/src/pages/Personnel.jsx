@@ -11,6 +11,7 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog';
 import personnelService from '../services/personnelService';
 
 const Personnel = () => {
@@ -62,21 +63,37 @@ const Personnel = () => {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (window.confirm("Êtes-vous sûr de vouloir supprimer ce membre du personnel ?")) {
+    // Delete Dialog Handling
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [personnelToDelete, setPersonnelToDelete] = useState(null);
+
+    const handleDeleteClick = (staff) => {
+        setPersonnelToDelete(staff);
+        setDeleteDialogOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (personnelToDelete) {
             try {
-                await personnelService.deletePersonnel(id);
+                await personnelService.deletePersonnel(personnelToDelete.id);
                 fetchPersonnel();
             } catch (error) {
                 console.error("Error deleting personnel:", error);
             }
         }
+        setDeleteDialogOpen(false);
+        setPersonnelToDelete(null);
+    };
+
+    const handleCancelDelete = () => {
+        setDeleteDialogOpen(false);
+        setPersonnelToDelete(null);
     };
 
     const filteredPersonnel = personnelList.filter(staff =>
-        staff.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        staff.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        staff.service.toLowerCase().includes(searchTerm.toLowerCase())
+        (staff.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (staff.role || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (staff.service || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return (
@@ -154,7 +171,7 @@ const Personnel = () => {
                                     <Stack direction="row" spacing={1} justifyContent="flex-end">
                                         <IconButton size="small" sx={{ color: 'text.secondary' }}><VisibilityIcon fontSize="small" /></IconButton>
                                         <IconButton size="small" onClick={() => handleOpen(staff)} sx={{ color: 'primary.main', bgcolor: '#EFF6FF', borderRadius: 1 }}><EditIcon fontSize="small" /></IconButton>
-                                        <IconButton size="small" onClick={() => handleDelete(staff.id)} sx={{ color: 'error.main', bgcolor: '#FEF2F2', borderRadius: 1 }}><DeleteOutlineIcon fontSize="small" /></IconButton>
+                                        <IconButton size="small" onClick={() => handleDeleteClick(staff)} sx={{ color: 'error.main', bgcolor: '#FEF2F2', borderRadius: 1 }}><DeleteOutlineIcon fontSize="small" /></IconButton>
                                     </Stack>
                                 </TableCell>
                             </TableRow>
@@ -216,6 +233,12 @@ const Personnel = () => {
                     <Button onClick={handleSave} variant="contained">Enregistrer</Button>
                 </DialogActions>
             </Dialog>
+            <DeleteConfirmationDialog
+                open={deleteDialogOpen}
+                onClose={handleCancelDelete}
+                onConfirm={handleConfirmDelete}
+                itemName={personnelToDelete ? personnelToDelete.name : null}
+            />
         </Box>
     );
 };

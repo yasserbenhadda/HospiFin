@@ -4,9 +4,9 @@ import '../../core/constants/app_colors.dart';
 import 'dashboard_screen.dart';
 import 'chat_screen.dart';
 import 'profile_screen.dart';
-import 'menu_screen.dart';
 import 'patients_screen.dart';
 import 'previsions_screen.dart';
+import '../navigation/menu_tab_navigator.dart';
 
 class MainContainer extends StatefulWidget {
   const MainContainer({super.key});
@@ -23,7 +23,7 @@ class _MainContainerState extends State<MainContainer> {
     const PatientsScreen(),
     const PrevisionsScreen(), // New separated screen
     const ChatScreen(),
-    const MenuScreen(),
+    const MenuTabNavigator(),
   ];
 
   @override

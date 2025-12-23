@@ -24,24 +24,13 @@ class MenuScreen extends StatelessWidget {
             // --- Header ---
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Navigation',
-                    style: GoogleFonts.inter(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF0F172A),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, size: 24, color: Color(0xFF64748B)),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
+              child: Text(
+                'Navigation',
+                style: GoogleFonts.inter(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF0F172A),
+                ),
               ),
             ),
             
@@ -66,14 +55,14 @@ class MenuScreen extends StatelessWidget {
                     _buildMenuItem(
                       context,
                       label: 'Médicaments',
-                      icon: Icons.link, // Simulating the pill/link icon
-                      destination: const Center(child: Text("Médicaments")), // Placeholder
+                      icon: Icons.link,
+                      destination: const MedicationsScreen(),
                     ),
                     _buildMenuItem(
                       context,
                       label: 'Consommations',
                       icon: Icons.shopping_cart_outlined,
-                      destination: const Center(child: Text("Consommables")), // Placeholder
+                      destination: const ConsumablesScreen(),
                     ),
                     _buildMenuItem(
                       context,

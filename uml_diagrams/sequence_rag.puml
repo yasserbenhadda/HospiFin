@@ -1,0 +1,38 @@
+@startuml
+participant User
+participant Frontend
+participant "CustomAIController" as AIController
+participant "ForecastServiceV2" as ForecastService
+participant "OpenAiService" as AIService
+participant "Local LLM Server" as LLM
+
+User -> Frontend: Asks "What is the cost trend?"
+activate Frontend
+Frontend -> AIController: POST /api/custom-ai/ask {question}
+activate AIController
+
+group Retrieval Phase (RAG)
+    AIController -> ForecastService: getGlobalForecast(7 days)
+    activate ForecastService
+    ForecastService --> AIController: Returns {currentTotal, predictedTotal, slope, seasonality}
+    deactivate ForecastService
+end
+
+AIController -> AIController: buildFinancialContext(forecastData)
+
+group Generation Phase
+    AIController -> AIService: getChatResponse(question, context)
+    activate AIService
+    AIService -> LLM: POST /chat/completions\n(System Prompt + Context + Question)
+    activate LLM
+    LLM --> AIService: Returns generated answer
+    deactivate LLM
+    AIService --> AIController: Returns answer string
+    deactivate AIService
+end
+
+AIController --> Frontend: Returns {answer}
+deactivate AIController
+Frontend --> User: Displays AI Response
+deactivate Frontend
+@enduml

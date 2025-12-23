@@ -14,10 +14,34 @@ class PersonnelService {
       return [];
     } catch (e) {
       print('Personnel Service Error: $e');
-      return [
-        {'id': 'P001', 'name': 'Dr. Meredith Grey', 'role': 'Chirurgien', 'service': 'Chirurgie'},
-        {'id': 'P002', 'name': 'Dr. Derek Shepherd', 'role': 'Neurochirurgien', 'service': 'Neuro'},
-      ];
+      rethrow;
+    }
+  }
+
+  Future<void> createPersonnel(Map<String, dynamic> data) async {
+    try {
+      await _apiService.dio.post(ApiConstants.personnelEndpoint, data: data);
+    } catch (e) {
+      print('Error creating personnel: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updatePersonnel(int id, Map<String, dynamic> data) async {
+    try {
+      await _apiService.dio.put('${ApiConstants.personnelEndpoint}/$id', data: data);
+    } catch (e) {
+      print('Error updating personnel: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deletePersonnel(int id) async {
+    try {
+      await _apiService.dio.delete('${ApiConstants.personnelEndpoint}/$id');
+    } catch (e) {
+      print('Error deleting personnel: $e');
+      rethrow;
     }
   }
 }

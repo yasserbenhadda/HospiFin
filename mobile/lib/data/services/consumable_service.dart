@@ -14,10 +14,34 @@ class ConsumableService {
       return [];
     } catch (e) {
       print('Consumable Service Error: $e');
-      return [
-        {'id': 'C001', 'name': 'Seringue', 'quantity': 1000, 'patient': 'Jean Martin'},
-        {'id': 'C002', 'name': 'Pansement', 'quantity': 500, 'patient': 'Marie Dubois'},
-      ];
+      throw e;
+    }
+  }
+
+  Future<void> deleteConsumable(int id) async {
+    try {
+      await _apiService.dio.delete('${ApiConstants.consumablesEndpoint}/$id');
+    } catch (e) {
+      print('Error deleting consumable: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> createConsumable(Map<String, dynamic> data) async {
+    try {
+      await _apiService.dio.post(ApiConstants.consumablesEndpoint, data: data);
+    } catch (e) {
+      print('Error creating consumable: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateConsumable(int id, Map<String, dynamic> data) async {
+    try {
+      await _apiService.dio.put('${ApiConstants.consumablesEndpoint}/$id', data: data);
+    } catch (e) {
+      print('Error updating consumable: $e');
+      rethrow;
     }
   }
 }

@@ -14,10 +14,36 @@ class MedicationService {
       return [];
     } catch (e) {
       print('Medication Service Error: $e');
-      return [
-        {'id': 'M001', 'name': 'Paracétamol', 'stock': 500, 'unit': 'Boîte'},
-        {'id': 'M002', 'name': 'Ibuprofène', 'stock': 200, 'unit': 'Boîte'},
-      ];
+      throw e; // Throw error to be handled by UI
+    }
+  }
+
+  Future<void> deleteMedication(int id) async {
+    try {
+      await _apiService.dio.delete('${ApiConstants.medicationsEndpoint}/$id');
+    } catch (e) {
+      print('Error deleting medication: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> createMedication(Map<String, dynamic> data) async {
+    try {
+      await _apiService.dio.post(ApiConstants.medicationsEndpoint, data: data);
+    } catch (e) {
+      print('Error creating medication: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateMedication(int id, Map<String, dynamic> data) async {
+    try {
+      final endpoint = '${ApiConstants.medicationsEndpoint}/$id';
+       print('Updating medication at: $endpoint with data: $data');
+      await _apiService.dio.put(endpoint, data: data);
+    } catch (e) {
+      print('Error updating medication: $e');
+      rethrow;
     }
   }
 }

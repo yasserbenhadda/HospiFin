@@ -11,6 +11,7 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog';
 import medicalActService from '../services/medicalActService';
 import patientService from '../services/patientService';
 
@@ -74,15 +75,31 @@ const MedicalActs = () => {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (window.confirm("Êtes-vous sûr de vouloir supprimer cet acte ?")) {
+    // Delete Dialog Handling
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [actToDelete, setActToDelete] = useState(null);
+
+    const handleDeleteClick = (act) => {
+        setActToDelete(act);
+        setDeleteDialogOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (actToDelete) {
             try {
-                await medicalActService.deleteMedicalAct(id);
+                await medicalActService.deleteMedicalAct(actToDelete.id);
                 fetchActs();
             } catch (error) {
                 console.error("Error deleting medical act:", error);
             }
         }
+        setDeleteDialogOpen(false);
+        setActToDelete(null);
+    };
+
+    const handleCancelDelete = () => {
+        setDeleteDialogOpen(false);
+        setActToDelete(null);
     };
 
     const filteredActs = acts.filter(act =>
@@ -152,7 +169,7 @@ const MedicalActs = () => {
                                     <Stack direction="row" spacing={1} justifyContent="flex-end">
                                         <IconButton size="small" sx={{ color: 'text.secondary' }}><VisibilityIcon fontSize="small" /></IconButton>
                                         <IconButton size="small" onClick={() => handleOpen(act)} sx={{ color: 'primary.main', bgcolor: '#EFF6FF', borderRadius: 1 }}><EditIcon fontSize="small" /></IconButton>
-                                        <IconButton size="small" onClick={() => handleDelete(act.id)} sx={{ color: 'error.main', bgcolor: '#FEF2F2', borderRadius: 1 }}><DeleteOutlineIcon fontSize="small" /></IconButton>
+                                        <IconButton size="small" onClick={() => handleDeleteClick(act)} sx={{ color: 'error.main', bgcolor: '#FEF2F2', borderRadius: 1 }}><DeleteOutlineIcon fontSize="small" /></IconButton>
                                     </Stack>
                                 </TableCell>
                             </TableRow>
@@ -218,6 +235,12 @@ const MedicalActs = () => {
                     <Button onClick={handleSave} variant="contained">Enregistrer</Button>
                 </DialogActions>
             </Dialog>
+            <DeleteConfirmationDialog
+                open={deleteDialogOpen}
+                onClose={handleCancelDelete}
+                onConfirm={handleConfirmDelete}
+                itemName={actToDelete ? `Acte: ${actToDelete.type}` : null}
+            />
         </Box>
     );
 };

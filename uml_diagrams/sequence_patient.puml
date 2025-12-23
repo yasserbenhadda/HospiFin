@@ -1,0 +1,31 @@
+@startuml
+actor User
+participant Frontend
+participant "PatientController" as PatientCtrl
+participant "StayController" as StayController
+database "H2 Database" as DB
+
+User -> Frontend: Clicks "New Patient"
+activate Frontend
+Frontend -> Frontend: Opens Form Dialog
+User -> Frontend: Fills Details & Clicks Save
+Frontend -> PatientCtrl: POST /api/patients
+activate PatientCtrl
+PatientCtrl -> DB: save(Patient)
+activate DB
+DB --> PatientCtrl: Returns Patient (with ID)
+deactivate DB
+PatientCtrl --> Frontend: Returns Success
+deactivate PatientCtrl
+
+User -> Frontend: Clicks "Add Stay" (for new patient)
+Frontend -> StayCtrl: POST /api/stays
+activate StayCtrl
+StayCtrl -> DB: save(HospitalStay)
+activate DB
+DB --> StayCtrl: Returns Stay
+deactivate DB
+StayCtrl --> Frontend: Updates Dashboard View
+deactivate StayCtrl
+deactivate Frontend
+@enduml

@@ -124,22 +124,51 @@ public class SettingsPage extends BasePage {
     /**
      * Update the profile name and save, then wait for page reload
      */
-    public void updateProfileName(String newName) {
-        setName(newName);
-        clickSaveButton();
-    }
-
     /**
      * Wait for page reload after save
      */
     public void waitForPageReload() {
         try {
-            // Wait for the page to reload (success message + reload time)
-            Thread.sleep(2000);
-            // Wait for page to be ready again
+            // Wait specifically for the header name to contain "TestSelenium" or generally
+            // update
+            // Since we know what we set it to (passed in updateProfileName, but here we are
+            // generic)
+            // We'll just increase the sleep to be safe, but ideally we should wait for a
+            // condition.
+
+            // The frontend waits 1000ms before reloading.
+            // We wait 1500ms to ensure reload has started.
+            Thread.sleep(1500);
+
+            // Now wait for the page title to come back (reload finished)
+            wait.until(ExpectedConditions.stalenessOf(driver.findElement(pageTitle)));
             wait.until(ExpectedConditions.visibilityOfElementLocated(pageTitle));
+
+            // And give the generic "fetchUser" useEffect a moment to populate the header
+            Thread.sleep(1000);
         } catch (Exception e) {
-            // Ignore
+            // Fallback if staleness fails (e.g. reload was too fast)
+            try {
+                Thread.sleep(3000);
+            } catch (InterruptedException ignored) {
+            }
+        }
+    }
+
+    /**
+     * Update the profile name and save, then wait for verification
+     */
+    public void updateProfileName(String newName) {
+        setName(newName);
+        clickSaveButton();
+        // Custom wait for this specific action's result in the header
+        try {
+            // Frontend delay (1s) + Reload time
+            Thread.sleep(1500);
+            // Wait for header to reflect the new name
+            wait.until(ExpectedConditions.textToBePresentInElementLocated(headerUserName, newName));
+        } catch (Exception e) {
+            System.out.println("Warning: Header didn't update within timeout: " + e.getMessage());
         }
     }
 }

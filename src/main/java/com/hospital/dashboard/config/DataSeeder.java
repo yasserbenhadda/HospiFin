@@ -63,13 +63,23 @@ public class DataSeeder implements CommandLineRunner {
         private void seedPersonnel() {
                 personnelRepository.saveAll(Arrays.asList(
                                 new Personnel(null, "Dr. Sophie Martin", "ADMIN", "Administration",
-                                                new BigDecimal("500.00"), "sophie.martin@hospital.com", "0123456789"),
-                                new Personnel(null, "Dr. House", "DOCTOR", "Diagnostic", new BigDecimal("800.00"),
-                                                "house@hospital.com", "0987654321"),
-                                new Personnel(null, "Nurse Joy", "NURSE", "Emergency", new BigDecimal("300.00"),
-                                                "joy@hospital.com", "1122334455"),
-                                new Personnel(null, "Dr. Strange", "SURGEON", "Surgery", new BigDecimal("900.00"),
-                                                "strange@hospital.com", "2233445566")));
+                                                new BigDecimal("500.00"), "sophie.martin@hospital.com",
+                                                "01 23 45 67 89"),
+                                new Personnel(null, "Dr. Gregory House", "DOCTEUR", "Diagnostic",
+                                                new BigDecimal("800.00"),
+                                                "house@hospital.com", "06 12 34 56 78"),
+                                new Personnel(null, "Isabelle Dubois", "INFIRMIÈRE", "Urgences",
+                                                new BigDecimal("300.00"),
+                                                "isabelle.dubois@hospital.com", "06 98 76 54 32"),
+                                new Personnel(null, "Dr. Stephen Strange", "CHIRURGIEN", "Chirurgie",
+                                                new BigDecimal("900.00"),
+                                                "strange@hospital.com", "07 11 22 33 44"),
+                                new Personnel(null, "Marc Levy", "ANESTHÉSISTE", "Bloc Opératoire",
+                                                new BigDecimal("750.00"),
+                                                "marc.levy@hospital.com", "06 55 44 33 22"),
+                                new Personnel(null, "Claire Redfield", "AIDE-SOIGNANTE", "Gériatrie",
+                                                new BigDecimal("250.00"),
+                                                "claire.redfield@hospital.com", "07 88 99 00 11")));
         }
 
         private void seedMedications() {
