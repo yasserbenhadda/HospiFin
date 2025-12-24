@@ -63,6 +63,7 @@ class OpenAiServiceTest {
                 .thenThrow(new HttpClientErrorException(HttpStatus.TOO_MANY_REQUESTS)); // 429
 
         String result = openAiService.getChatResponse("Hello");
-        assertTrue(result.contains("Erreur de communication"));
+        // Expect Fallback response
+        assertTrue(result.contains("mode de secours") || result.contains("Info Secours"));
     }
 }

@@ -10,7 +10,6 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -31,11 +30,13 @@ class CustomAIControllerTest {
     @MockBean
     private CustomAIService customAIService;
 
+    @MockBean
+    private com.hospital.dashboard.service.ChatService chatService;
+
     @Test
     void testAsk() throws Exception {
         given(customAIService.isTrained()).willReturn(true); // Mock training check
-        given(openAiService.getChatResponse(anyString(), any())).willReturn("AI Answer"); // Updated mock to match 2-arg
-                                                                                          // call
+        given(chatService.chat(anyString())).willReturn("AI Answer"); // Mock ChatService delegation
 
         mockMvc.perform(post("/api/custom-ai/ask")
                 .contentType(MediaType.APPLICATION_JSON)
