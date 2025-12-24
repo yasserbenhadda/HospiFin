@@ -4,6 +4,9 @@ import '../../core/constants/app_colors.dart';
 import '../../data/services/medication_service.dart';
 import '../../data/services/patient_service.dart';
 import '../../data/services/consumable_service.dart';
+import '../../data/models/patient_model.dart';
+import '../widgets/custom_header.dart'; // Added
+import 'package:intl/intl.dart';
 
 class ConsumablesScreen extends StatefulWidget {
   const ConsumablesScreen({super.key});
@@ -74,18 +77,10 @@ class _ConsumablesScreenState extends State<ConsumablesScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
-      appBar: AppBar(
-        title: Text('Consommables', style: GoogleFonts.inter(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(icon: const Icon(Icons.notifications_none, color: Colors.grey), onPressed: () {}),
-          const CircleAvatar(
-             backgroundColor: Color(0xFF00796B),
-             child: Icon(Icons.person, color: Colors.white),
-          ),
-          const SizedBox(width: 16),
-        ],
+      appBar: const CustomHeader(
+        title: 'Consommables',
+        subtitle: 'Gestion des stocks',
+        showBackButton: true,
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -95,21 +90,7 @@ class _ConsumablesScreenState extends State<ConsumablesScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                if (Navigator.of(context).canPop())
-                   Padding(
-                      padding: const EdgeInsets.only(right: 12.0),
-                      child: IconButton(
-                         icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
-                         onPressed: () => Navigator.of(context).pop(),
-                         padding: EdgeInsets.zero,
-                         constraints: const BoxConstraints(),
-                         style: IconButton.styleFrom(
-                           backgroundColor: Colors.white,
-                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: const BorderSide(color: Color(0xFFE2E8F0))),
-                           padding: const EdgeInsets.all(8)
-                         ),
-                      ),
-                   ),
+                // Back button removed
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -305,8 +286,6 @@ class _ConsumablesScreenState extends State<ConsumablesScreen> {
     );
   }
 
-
-
   Widget _buildInfoRow(String label, String value, {bool isBold = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -326,11 +305,18 @@ class _ConsumablesScreenState extends State<ConsumablesScreen> {
     final isEdit = item != null;
     final quantityController = TextEditingController(text: item?['quantity']?.toString());
     final totalCostController = TextEditingController(text: item?['totalCost']?.toString() ?? '');
-    final dateController = TextEditingController(text: item?['date']?.toString().split('T')[0] ?? DateTime.now().toIso8601String().split('T')[0]);
+    
+    // Date Controller handling
+    DateTime initialDate;
+    if (item != null && item['date'] != null) {
+      initialDate = DateTime.parse(item['date']);
+    } else {
+      initialDate = DateTime.now();
+    }
     
     // Fetch dropdown data
     List<dynamic> medications = [];
-    List<dynamic> patients = [];
+    List<Patient> patients = []; // Correct type
     try {
       medications = await _medicationService.getMedications();
       patients = await _patientService.getPatients();
@@ -349,8 +335,8 @@ class _ConsumablesScreenState extends State<ConsumablesScreen> {
     
     // Ensure selected IDs still exist in fetched lists
     if (isEdit) {
-      if (medications.isNotEmpty && selectedMedicationId == null) selectedMedicationId = medications.first['id'];
-      if (patients.isNotEmpty && selectedPatientId == null) selectedPatientId = patients.first['id'];
+      if (medications.isNotEmpty && selectedMedicationId == null) selectedMedicationId = medications.firstOrNull?['id'];
+      if (patients.isNotEmpty && selectedPatientId == null) selectedPatientId = patients.firstOrNull?.id;
     }
 
 
@@ -358,6 +344,7 @@ class _ConsumablesScreenState extends State<ConsumablesScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => Dialog(
+        backgroundColor: const Color(0xFFEFF3F8), // Matches design background
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Container(
           padding: const EdgeInsets.all(24),
@@ -388,18 +375,33 @@ class _ConsumablesScreenState extends State<ConsumablesScreen> {
                 _buildStyledTextField(controller: quantityController, label: "Quantité", isNumber: true),
                 const SizedBox(height: 16),
                 
-                _buildStyledTextField(controller: dateController, label: "Date", hint: "yyyy-mm-dd"), // Simple date text input for NOW
+                // Date Picker Tile
+                ListTile(
+                   contentPadding: EdgeInsets.zero,
+                   title: Text("Date", style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B))),
+                   subtitle: Text(DateFormat('yyyy-MM-dd').format(initialDate), style: GoogleFonts.inter(fontSize: 16, color: const Color(0xFF1E293B))),
+                   trailing: const Icon(Icons.calendar_today, color: Color(0xFF64748B)),
+                   onTap: () async {
+                      final d = await showDatePicker(
+                        context: context, 
+                        initialDate: initialDate, 
+                        firstDate: DateTime(2020), 
+                        lastDate: DateTime(2030)
+                      );
+                      if (d != null) setState(() => initialDate = d);
+                   },
+                ),
                 const SizedBox(height: 16),
                 
-                // Patient Dropdown
+                // Patient Dropdown (FIXED: Uses Patient object properties)
                 _buildStyledDropdown(
                   label: "Patient",
                   value: selectedPatientId,
                   hint: "Sélectionner un patient",
                   items: patients.map<DropdownMenuItem<int>>((p) {
                     return DropdownMenuItem<int>(
-                      value: p['id'],
-                      child: Text('${p['firstName']} ${p['lastName']}'),
+                      value: p.id,
+                      child: Text(p.fullName), // Using getter from model
                     );
                   }).toList(),
                   onChanged: (val) => setState(() => selectedPatientId = val),
@@ -422,7 +424,7 @@ class _ConsumablesScreenState extends State<ConsumablesScreen> {
                         try {
                           final data = {
                             'quantity': int.tryParse(quantityController.text) ?? 0,
-                            'date': dateController.text, // Should be valid ISO date
+                            'date': DateFormat('yyyy-MM-dd').format(initialDate),
                             'patient': {'id': selectedPatientId}, 
                             'medication': {'id': selectedMedicationId},
                             'totalCost': double.tryParse(totalCostController.text) ?? 0.0,
@@ -473,8 +475,9 @@ class _ConsumablesScreenState extends State<ConsumablesScreen> {
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        labelStyle: GoogleFonts.inter(color: const Color(0xFF64748B), fontSize: 14),
-        floatingLabelStyle: GoogleFonts.inter(color: const Color(0xFF1E293B), fontWeight: FontWeight.w600),
+        labelStyle: GoogleFonts.inter(color: const Color(0xFF1E293B), fontSize: 13, fontWeight: FontWeight.bold),
+        floatingLabelStyle: GoogleFonts.inter(color: const Color(0xFF1E293B), fontWeight: FontWeight.bold),
+        floatingLabelBehavior: FloatingLabelBehavior.always, // Consistent styling
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
@@ -495,8 +498,9 @@ class _ConsumablesScreenState extends State<ConsumablesScreen> {
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        labelStyle: GoogleFonts.inter(color: const Color(0xFF64748B), fontSize: 14),
-        floatingLabelStyle: GoogleFonts.inter(color: const Color(0xFF1E293B), fontWeight: FontWeight.w600),
+        labelStyle: GoogleFonts.inter(color: const Color(0xFF1E293B), fontSize: 13, fontWeight: FontWeight.bold),
+        floatingLabelStyle: GoogleFonts.inter(color: const Color(0xFF1E293B), fontWeight: FontWeight.bold),
+        floatingLabelBehavior: FloatingLabelBehavior.always, // Consistent styling
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
@@ -505,13 +509,6 @@ class _ConsumablesScreenState extends State<ConsumablesScreen> {
         fillColor: Colors.white,
       ),
     );
-  }
-  
-  String _getPatientName(dynamic item) {
-    if (item == null || item['patient'] == null) return '';
-    if (item['patient'] is String) return item['patient'];
-    if (item['patient'] is Map) return item['patient']['name'] ?? '';
-    return item['patient'].toString();
   }
 
   Future<void> _confirmDelete({required BuildContext width, required dynamic id}) async {

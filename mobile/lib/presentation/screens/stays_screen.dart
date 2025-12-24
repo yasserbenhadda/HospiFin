@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import '../../core/constants/app_colors.dart';
 import '../../data/models/stay_model.dart';
+import '../../data/models/patient_model.dart';
 import '../../data/services/stay_service.dart';
+import '../../data/services/patient_service.dart';
+import '../widgets/custom_header.dart';
 
 class StaysScreen extends StatefulWidget {
   const StaysScreen({super.key});
@@ -14,6 +16,7 @@ class StaysScreen extends StatefulWidget {
 
 class _StaysScreenState extends State<StaysScreen> {
   final StayService _stayService = StayService();
+  final PatientService _patientService = PatientService();
   final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'fr_FR', symbol: '€', decimalDigits: 0);
   final DateFormat _dateFormat = DateFormat('dd/MM/yyyy');
 
@@ -47,6 +50,238 @@ class _StaysScreenState extends State<StaysScreen> {
     }
   }
 
+  Future<void> _deleteStay(HospitalStay stay) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Confirmer la suppression"),
+        content: Text("Voulez-vous vraiment supprimer le séjour de ${stay.patientName} ?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Annuler")),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true), 
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text("Supprimer")
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+       try {
+        await _stayService.deleteStay(stay.id!);
+        _loadStays();
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Séjour supprimé")));
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur lors de la suppression: $e")));
+      }
+    }
+  }
+
+  Future<void> _showStayDialog({HospitalStay? stay}) async {
+    // Load patients for dropdown
+    List<Patient> patients = [];
+    try {
+      patients = await _patientService.getPatients();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Impossible de charger les patients: $e")));
+      return;
+    }
+
+    final isEditing = stay != null;
+    final formKey = GlobalKey<FormState>();
+    
+    int? selectedPatientId = stay?.patientId;
+    String service = stay?.service ?? 'Cardiologie';
+    DateTime startDate = stay?.startDate ?? DateTime.now();
+    DateTime endDate = stay?.endDate ?? DateTime.now().add(const Duration(days: 3));
+    double cost = stay?.totalCost ?? 0.0;
+    String status = stay?.status ?? 'En cours';
+
+    final services = ['Cardiologie', 'Neurologie', 'Chirurgie', 'Pédiatrie', 'Urgences', 'Oncologie', 'Autre'];
+    final statuses = ['Prévu', 'En cours', 'Terminé'];
+    
+    final costController = TextEditingController(text: cost == 0 ? '' : cost.toStringAsFixed(0));
+    final startController = TextEditingController(text: _dateFormat.format(startDate));
+    final endController = TextEditingController(text: _dateFormat.format(endDate));
+
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Dialog(
+        backgroundColor: const Color(0xFFEFF3F8), // Matches design background
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                   Text(isEditing ? "Modifier le séjour" : "Nouveau séjour", 
+                      style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B))),
+                  const SizedBox(height: 24),
+
+                  // 1. Patient
+                  DropdownButtonFormField<int>(
+                    value: selectedPatientId,
+                    decoration: _inputDecoration("Patient"),
+                    items: patients.map((p) => DropdownMenuItem(value: p.id, child: Text("${p.firstName} ${p.lastName}"))).toList(),
+                    onChanged: (val) => setState(() => selectedPatientId = val),
+                    validator: (val) => val == null ? 'Veuillez sélectionner un patient' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // 2. Service
+                  DropdownButtonFormField<String>(
+                    value: service,
+                    decoration: _inputDecoration("Service"),
+                    items: services.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                    onChanged: (val) => setState(() => service = val!),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // 3. Cost
+                  TextFormField(
+                    controller: costController,
+                    decoration: _inputDecoration("Coût Total (€)"),
+                    keyboardType: TextInputType.number,
+                    onChanged: (val) => cost = double.tryParse(val) ?? 0.0,
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // 4. Status
+                  DropdownButtonFormField<String>(
+                    value: status,
+                    decoration: _inputDecoration("Statut"),
+                    items: statuses.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                    onChanged: (val) => setState(() => status = val!),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // 5. Start Date
+                  _buildDatePicker(
+                    context: context,
+                    label: "Date de début",
+                    controller: startController,
+                    initialDate: startDate,
+                    onDateSelected: (d) => setState(() { startDate = d; startController.text = _dateFormat.format(d); }),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 6. End Date
+                  _buildDatePicker(
+                    context: context,
+                    label: "Date de fin",
+                    controller: endController,
+                    initialDate: endDate,
+                    onDateSelected: (d) => setState(() { endDate = d; endController.text = _dateFormat.format(d); }),
+                  ),
+
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text("Annuler", style: GoogleFonts.inter(color: const Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () async {
+                          if (formKey.currentState!.validate()) {
+                            // Find patient name for placeholder if needed (though backend usually handles link, frontend lists might need it immediately)
+                            String pName = "Patient";
+                             try {
+                                 pName = patients.firstWhere((p) => p.id == selectedPatientId).lastName;
+                              } catch (_) {}
+
+                            final newStay = HospitalStay(
+                              id: stay?.id ?? 0,
+                              patientId: selectedPatientId!,
+                              patientName: pName,
+                              service: service,
+                              startDate: startDate,
+                              endDate: endDate,
+                              totalCost: cost,
+                              status: status,
+                              pathology: service,
+                            );
+
+                            try {
+                              if (isEditing) {
+                                await _stayService.updateStay(newStay);
+                              } else {
+                                await _stayService.createStay(newStay);
+                              }
+                              _loadStays();
+                              if (mounted) {
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isEditing ? "Séjour modifié" : "Séjour créé")));
+                              }
+                            } catch (e) {
+                               if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));
+                            }
+                          }
+                        },
+                         style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1E293B),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: 0,
+                          ),
+                        child: Text("Enregistrer", style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                      )
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: GoogleFonts.inter(color: const Color(0xFF1E293B), fontSize: 13, fontWeight: FontWeight.bold),
+      floatingLabelStyle: GoogleFonts.inter(color: const Color(0xFF1E293B), fontWeight: FontWeight.bold),
+      floatingLabelBehavior: FloatingLabelBehavior.always, // Ensures consistent border placement
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF1E293B), width: 1.5)),
+      filled: true,
+      fillColor: Colors.white,
+    );
+  }
+
+  Widget _buildDatePicker({required BuildContext context, required String label, required TextEditingController controller, required DateTime initialDate, required Function(DateTime) onDateSelected}) {
+     return TextFormField(
+        controller: controller,
+        decoration: _inputDecoration(label).copyWith(
+          suffixIcon: const Icon(Icons.calendar_today, size: 20, color: Colors.grey),
+        ),
+        readOnly: true,
+        onTap: () async {
+          final d = await showDatePicker(
+            context: context, 
+            initialDate: initialDate, 
+            firstDate: DateTime(2020), 
+            lastDate: DateTime(2030)
+          );
+          if (d != null) onDateSelected(d);
+        },
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_errorMessage != null) {
@@ -74,18 +309,10 @@ class _StaysScreenState extends State<StaysScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
-      appBar: AppBar(
-        title: Text('Séjours hospitaliers', style: GoogleFonts.inter(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(icon: const Icon(Icons.notifications_none, color: Colors.grey), onPressed: () {}),
-          const CircleAvatar(
-             backgroundColor: Color(0xFF00796B),
-             child: Icon(Icons.person, color: Colors.white),
-          ),
-          const SizedBox(width: 16),
-        ],
+      appBar: const CustomHeader(
+        title: 'Séjours hospitaliers',
+        subtitle: 'Gestion des admissions',
+        showBackButton: true,
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -95,21 +322,25 @@ class _StaysScreenState extends State<StaysScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Gestion des séjours", style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold)),
-                    Text("${_stays.length} séjours enregistrés", style: GoogleFonts.inter(fontSize: 12, color: Colors.grey)),
-                  ],
+                // Back button removed from here
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Gestion des séjours", style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold)),
+                      Text("${_stays.length} séjours enregistrés", style: GoogleFonts.inter(fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
                 ),
                 ElevatedButton.icon(
-                  onPressed: () {},
+                  onPressed: () => _showStayDialog(),
                   icon: const Icon(Icons.add, size: 16),
                   label: const Text("Nouveau séjour"),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black,
-                    foregroundColor: Colors.white, // Text Color
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   ),
                 )
               ],
@@ -180,7 +411,7 @@ class _StaysScreenState extends State<StaysScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.inter(color: Colors.black54)),
+          Text(label, style: GoogleFonts.inter(color: Colors.black54), overflow: TextOverflow.ellipsis),
           const Icon(Icons.keyboard_arrow_down, color: Colors.black54, size: 16),
         ],
       ),
@@ -188,7 +419,6 @@ class _StaysScreenState extends State<StaysScreen> {
   }
 
   Widget _buildStayCard(HospitalStay stay, int displayId) {
-    // Determine color based on status
     Color statusColor = Colors.grey;
     Color statusBg = Colors.grey.shade100;
     
@@ -244,7 +474,7 @@ class _StaysScreenState extends State<StaysScreen> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {},
+                  onPressed: () => _showStayDialog(stay: stay),
                   icon: const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF1E3A8A)),
                   label: const Text("Modifier", style: TextStyle(color: Color(0xFF1E3A8A))),
                   style: OutlinedButton.styleFrom(
@@ -257,7 +487,7 @@ class _StaysScreenState extends State<StaysScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {},
+                  onPressed: () => _deleteStay(stay),
                   icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
                   label: const Text("Supprimer", style: TextStyle(color: Colors.red)),
                    style: OutlinedButton.styleFrom(

@@ -11,7 +11,7 @@ class ApiConstants {
   
   static const String loginEndpoint = '/auth/login';
   static const String dashboardSummaryEndpoint = '/dashboard/summary';
-  static const String chatEndpoint = '/custom-ai/ask';
+  static const String chatEndpoint = '/chat';
   
   // New endpoints
   static const String patientsEndpoint = '/patients';

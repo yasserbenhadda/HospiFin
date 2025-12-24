@@ -1,15 +1,15 @@
-import 'package:dio/dio.dart';
+import '../models/patient_model.dart';
 import '../../core/constants/api_constants.dart';
 import 'api_service.dart';
 
 class PatientService {
   final ApiService _apiService = ApiService();
 
-  Future<List<dynamic>> getPatients() async {
+  Future<List<Patient>> getPatients() async {
     try {
       final response = await _apiService.dio.get(ApiConstants.patientsEndpoint);
       if (response.statusCode == 200 && response.data != null) {
-        return response.data as List<dynamic>;
+        return (response.data as List).map((json) => Patient.fromJson(json)).toList();
       }
       return [];
     } catch (e) {

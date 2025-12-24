@@ -9,11 +9,11 @@ class ChatService {
     try {
       final response = await _apiService.dio.post(
         ApiConstants.chatEndpoint,
-        data: {'question': message},
+        data: {'message': message},
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        return response.data['answer'] ?? 'No response';
+        return response.data['response'] ?? 'No response';
       }
       return 'Error: Invalid response from server';
     } catch (e) {

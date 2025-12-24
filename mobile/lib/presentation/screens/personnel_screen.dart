@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/services/personnel_service.dart';
+import '../widgets/custom_header.dart'; // Corrected import
 import 'package:google_fonts/google_fonts.dart';
 
 class PersonnelScreen extends StatefulWidget {
@@ -55,7 +56,6 @@ class _PersonnelScreenState extends State<PersonnelScreen> {
         final fName = p['firstName'] ?? '';
         final lName = p['lastName'] ?? '';
         final name = '$fName $lName'.toLowerCase();
-        // Fallback for mock data that uses 'name'
         final oldName = (p['name'] ?? '').toString().toLowerCase();
         
         final role = (p['role'] ?? '').toLowerCase();
@@ -109,57 +109,36 @@ class _PersonnelScreenState extends State<PersonnelScreen> {
     }
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-               // --- Header ---
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Back Button (if possible to pop)
-                  if (Navigator.of(context).canPop())
-                    Padding(
-                      padding: const EdgeInsets.only(right: 12.0),
-                      child: IconButton(
-                         icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
-                         onPressed: () => Navigator.of(context).pop(),
-                         padding: EdgeInsets.zero,
-                         constraints: const BoxConstraints(),
-                         style: IconButton.styleFrom(
-                           backgroundColor: Colors.white,
-                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: const BorderSide(color: Color(0xFFE2E8F0))),
-                           padding: const EdgeInsets.all(8)
-                         ),
+      appBar: const CustomHeader(
+        title: 'Personnel',
+        subtitle: 'Gestion des équipes',
+        showBackButton: true,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+             // --- Header ---
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Duplicate Title Removed
+                      Text(
+                        '${_allPersonnel.length} membres enregistrés',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: const Color(0xFF64748B),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Gestion du personnel',
-                          style: GoogleFonts.inter(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF0F172A),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${_allPersonnel.length} membres enregistrés',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: const Color(0xFF64748B),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
+                ),
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
                     onPressed: () => _showPersonnelDialog(),
@@ -223,7 +202,6 @@ class _PersonnelScreenState extends State<PersonnelScreen> {
             ],
           ),
         ),
-      ),
     );
   }
 
@@ -392,7 +370,7 @@ class _PersonnelScreenState extends State<PersonnelScreen> {
   void _showPersonnelDialog({Map<String, dynamic>? item}) {
     final isEdit = item != null;
     
-    // Logic to split name if firstName/lastName are missing (backend only sends name)
+    // Logic to split name if firstName/lastName are missing
     String fName = item?['firstName'] ?? '';
     String lName = item?['lastName'] ?? '';
     if (isEdit && fName.isEmpty && lName.isEmpty && item?['name'] != null) {
@@ -417,22 +395,10 @@ class _PersonnelScreenState extends State<PersonnelScreen> {
       context: context,
       barrierColor: const Color(0xFF0F172A).withOpacity(0.5),
       builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        backgroundColor: const Color(0xFFEFF3F8), // High Contrast
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Container(
-          width: 400,
-          padding: const EdgeInsets.all(32),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF0F172A).withOpacity(0.15),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
+          padding: const EdgeInsets.all(24),
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -444,11 +410,11 @@ class _PersonnelScreenState extends State<PersonnelScreen> {
                    children: [
                      Text(
                        isEdit ? 'Modifier le membre' : 'Nouveau membre',
-                       style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                       style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B)),
                      ),
                      IconButton(
                        onPressed: () => Navigator.of(ctx).pop(),
-                       icon: const Icon(Icons.close, color: Color(0xFF94A3B8)),
+                       icon: const Icon(Icons.close, color: Color(0xFF64748B)),
                        splashRadius: 20,
                      )
                    ],
@@ -456,19 +422,19 @@ class _PersonnelScreenState extends State<PersonnelScreen> {
                  const SizedBox(height: 24),
                  
                  // Form Fields
-                 _buildDialogTextField(label: 'Prénom', controller: fNameController),
+                 _buildStyledTextField(label: 'Prénom', controller: fNameController),
                  const SizedBox(height: 16),
-                 _buildDialogTextField(label: 'Nom', controller: lNameController),
+                 _buildStyledTextField(label: 'Nom', controller: lNameController),
                  const SizedBox(height: 16),
-                 _buildDialogTextField(label: 'Rôle', controller: roleController),
+                 _buildStyledTextField(label: 'Rôle', controller: roleController),
                  const SizedBox(height: 16),
-                 _buildDialogTextField(label: 'Service', controller: serviceController),
+                 _buildStyledTextField(label: 'Service', controller: serviceController),
                  const SizedBox(height: 16),
-                 _buildDialogTextField(label: 'Email', controller: emailController),
+                 _buildStyledTextField(label: 'Email', controller: emailController),
                  const SizedBox(height: 16),
-                 _buildDialogTextField(label: 'Téléphone', controller: phoneController),
+                 _buildStyledTextField(label: 'Téléphone', controller: phoneController),
                  const SizedBox(height: 16),
-                 _buildDialogTextField(label: 'Salaire (€)', controller: salaryController),
+                 _buildStyledTextField(label: 'Salaire (€)', controller: salaryController, isNumber: true),
                  
                  const SizedBox(height: 32),
                  
@@ -488,7 +454,7 @@ class _PersonnelScreenState extends State<PersonnelScreen> {
                       ElevatedButton(
                         onPressed: () async {
                           final data = {
-                            'name': '${fNameController.text} ${lNameController.text}'.trim(), // COMBINE HERE
+                            'name': '${fNameController.text} ${lNameController.text}'.trim(),
                             'role': roleController.text,
                             'service': serviceController.text,
                             'email': emailController.text,
@@ -525,11 +491,11 @@ class _PersonnelScreenState extends State<PersonnelScreen> {
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0F172A),
+                          backgroundColor: const Color(0xFF1E293B),
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                         child: Text('Enregistrer', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
                       ),
@@ -543,29 +509,32 @@ class _PersonnelScreenState extends State<PersonnelScreen> {
     );
   }
 
-  Widget _buildDialogTextField({required String label, required TextEditingController controller}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF475569))),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: TextField(
-            controller: controller,
-            style: GoogleFonts.inter(color: const Color(0xFF0F172A)),
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              isDense: true,
-            ),
-          ),
+  Widget _buildStyledTextField({required String label, required TextEditingController controller, bool isNumber = false}) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF1E293B)),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.inter(color: const Color(0xFF1E293B), fontSize: 13, fontWeight: FontWeight.bold),
+        floatingLabelStyle: GoogleFonts.inter(color: const Color(0xFF1E293B), fontWeight: FontWeight.bold),
+        floatingLabelBehavior: FloatingLabelBehavior.always, // High Contrast Style
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
-      ],
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF1E293B), width: 1.5),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+      ),
     );
   }
 

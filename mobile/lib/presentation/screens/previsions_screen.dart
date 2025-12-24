@@ -1,13 +1,10 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:math' as math;
 import '../../core/constants/app_colors.dart';
-import '../../data/models/stay_model.dart';
-import '../../data/models/medical_act_model.dart';
-import '../../data/services/stay_service.dart';
-import '../../data/services/medical_act_service.dart';
 import '../../data/services/forecast_service.dart';
-import '../../data/services/service_mapper.dart';
+import '../widgets/custom_header.dart';
 import 'package:intl/intl.dart';
 
 class PrevisionsScreen extends StatefulWidget {
@@ -19,23 +16,23 @@ class PrevisionsScreen extends StatefulWidget {
 
 class _PrevisionsScreenState extends State<PrevisionsScreen> {
   final ForecastService _forecastService = ForecastService();
-  final StayService _stayService = StayService();
-  final MedicalActService _actService = MedicalActService();
   final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'fr_FR', symbol: '€', decimalDigits: 0);
 
   bool _isLoading = true;
   double _totalPredictedCost = 0;
-  Map<String, double> _serviceCosts = {
-    ServiceMapper.chirurgie: 0,
-    ServiceMapper.cardiologie: 0,
-    ServiceMapper.urgences: 0,
-    ServiceMapper.maternite: 0,
-    ServiceMapper.radiologie: 0,
-  };
-  Map<String, double> _historicalCosts = {};
+  
+  // Data for the 3 Categories matching Web App
+  Map<String, dynamic> _medicalActsData = {};
+  Map<String, dynamic> _consumablesData = {};
+  Map<String, dynamic> _staysData = {};
 
   // Chart Data
   List<FlSpot> _spots = [];
+  List<String> _xAxisLabels = [];
+  double _minY = 0;
+  double _maxY = 10000;
+  
+  int _selectedPeriod = 60; // Default to 60 days to match Web Screenshot
 
   String? _errorMessage;
 
@@ -52,61 +49,72 @@ class _PrevisionsScreenState extends State<PrevisionsScreen> {
     });
 
     try {
-      // 1. Fetch Backend Forecast (Result of Math Prediction)
-      final forecastData = await _forecastService.getForecast(30);
-      final double predictedTotal = (forecastData['globalPrediction'] as num?)?.toDouble() ?? 0.0;
+      final data = await _forecastService.getForecast(_selectedPeriod);
       
-      // 2. Fetch History Points for Chart
-      final List<dynamic> history = forecastData['history'] ?? [];
+      // 1. Global Totals
+      double predictedTotal = (data['globalPrediction'] as num?)?.toDouble() ?? 0.0;
+      
+      // 2. Categories Data
+      _medicalActsData = data['medicalActs'] ?? {};
+      _consumablesData = data['consumables'] ?? {};
+      _staysData = data['stays'] ?? {};
+
+      // 3. Global History for Chart
+      final List<dynamic> history = data['globalHistory'] ?? [];
+      
       List<FlSpot> spots = [];
+      List<String> labels = [];
       
-      // Take last 8 points/weeks for the chart
-      int startIndex = history.length > 8 ? history.length - 8 : 0;
-      for (int i = startIndex; i < history.length; i++) {
+      double minVal = double.maxFinite;
+      double maxVal = double.minPositive;
+
+      // Show all points returned by backend for the selected period
+      int count = history.length;
+      
+      for (int i = 0; i < count; i++) {
         final point = history[i];
-        final val = (point['predicted'] as num?)?.toDouble() ?? 0.0;
-        spots.add(FlSpot((i - startIndex).toDouble(), val));
+        
+        // Priority: 'real' > 'predicted' > 'cost'
+        double val = 0.0;
+        if (point.containsKey('real') && point['real'] != null) {
+          val = (point['real'] as num).toDouble();
+        } else if (point.containsKey('predicted') && point['predicted'] != null) {
+          val = (point['predicted'] as num).toDouble();
+        }
+
+        if (val < minVal) minVal = val;
+        if (val > maxVal) maxVal = val;
+        
+        spots.add(FlSpot(i.toDouble(), val));
+        
+        // Label
+        String label = point['month'] ?? "";
+        // Try parsing ISO date
+        try {
+          DateTime d = DateTime.parse(label); 
+          label = "${d.day}/${d.month}";
+        } catch (_) { }
+        labels.add(label);
       }
 
-      // 3. Fetch Raw Data ONLY to determine Service Ratios (Distribution)
-      final stays = await _stayService.getStays();
-      final acts = await _actService.getMedicalActs();
-
-      Map<String, double> historicalServiceTotals = {
-        ServiceMapper.chirurgie: 0,
-        ServiceMapper.cardiologie: 0,
-        ServiceMapper.urgences: 0,
-        ServiceMapper.maternite: 0,
-        ServiceMapper.radiologie: 0,
-      };
+      // Auto-scale
+      if (minVal == double.maxFinite) {
+        minVal = 0;
+        maxVal = 1000;
+      }
       
-      double totalHistoricalAmount = 0;
-
-      for (var stay in stays) {
-         historicalServiceTotals.update(stay.service, (val) => val + stay.totalCost, ifAbsent: () => stay.totalCost);
-         totalHistoricalAmount += stay.totalCost;
-      }
-      for (var act in acts) {
-         historicalServiceTotals.update(act.service, (val) => val + act.cost, ifAbsent: () => act.cost);
-         totalHistoricalAmount += act.cost;
-      }
-
-      // Apply Ratios to Future Prediction
-      Map<String, double> predictedServiceCosts = {};
-      if (totalHistoricalAmount > 0) {
-        historicalServiceTotals.forEach((key, value) {
-          double ratio = value / totalHistoricalAmount;
-          predictedServiceCosts[key] = predictedTotal * ratio;
-        });
-      } else {
-        predictedServiceCosts = historicalServiceTotals; // Fallback
-      }
-
+      // Add padding
+      double range = maxVal - minVal;
+      if (range == 0) range = 100;
+      double chartMin = minVal - (range * 0.1);
+      double chartMax = maxVal + (range * 0.1);
+      
       setState(() {
         _totalPredictedCost = predictedTotal;
         _spots = spots;
-        _serviceCosts = predictedServiceCosts;
-        _historicalCosts = historicalServiceTotals;
+        _xAxisLabels = labels;
+        _minY = chartMin > 0 ? chartMin : 0;
+        _maxY = chartMax;
         _isLoading = false;
       });
 
@@ -114,9 +122,17 @@ class _PrevisionsScreenState extends State<PrevisionsScreen> {
       print('Error loading previsions: $e');
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Erreur de connexion : Vérifiez le Backend.\nDétail: $e';
+        _errorMessage = 'Erreur: $e';
       });
     }
+  }
+
+  void _onPeriodChanged(int days) {
+    if (_selectedPeriod == days) return;
+    setState(() {
+      _selectedPeriod = days;
+    });
+    _loadData();
   }
 
   @override
@@ -129,48 +145,45 @@ class _PrevisionsScreenState extends State<PrevisionsScreen> {
       return Scaffold(
         backgroundColor: const Color(0xFFF5F7FB),
         body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.cloud_off, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
-            Text(
-              'Oups ! Connexion impossible.',
-              style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Vérifiez que le serveur Spring Boot est lancé.',
-              style: GoogleFonts.inter(color: Colors.grey),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _loadData,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2C5F78),
-                foregroundColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.cloud_off, size: 64, color: Colors.grey),
+              const SizedBox(height: 16),
+              Text(
+                'Impossible de récupérer les prévisions.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              child: const Text('Réessayer'),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                '$_errorMessage',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(color: Colors.red[300], fontSize: 12),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _loadData,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2C5F78),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Réessayer'),
+              ),
+            ],
+          ),
         ),
       ));
     }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
-      appBar: AppBar(
-        title: Text('Prévisions financières', style: GoogleFonts.inter(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(icon: const Icon(Icons.notifications_none, color: Colors.grey), onPressed: () {}),
-          const CircleAvatar(
-             backgroundColor: Color(0xFF00796B),
-             child: Icon(Icons.person, color: Colors.white),
-          ),
-          const SizedBox(width: 16),
-        ],
+      appBar: const CustomHeader(
+        title: 'Prévisions financières',
+        subtitle: 'Tableau de bord de gestion hospitalière',
+        showBackButton: true,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -179,27 +192,25 @@ class _PrevisionsScreenState extends State<PrevisionsScreen> {
           children: [
             Text("Prévisions des coûts", style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text("Anticipez les dépenses futures basées sur l'analyse prédictive", style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[600])),
+            Text("Anticipez les dépenses futures", style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[600])),
+            
             const SizedBox(height: 20),
             
             // Period Selector
             Container(
               padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
               child: Row(
                 children: [
-                  _buildPeriodButton("30 jours", true),
-                  _buildPeriodButton("60 jours", false),
-                  _buildPeriodButton("90 jours", false),
+                  _buildPeriodButton("30 jours", 30),
+                  _buildPeriodButton("60 jours", 60),
+                  _buildPeriodButton("90 jours", 90),
                 ],
               ),
             ),
             const SizedBox(height: 20),
 
-            // Main Card
+            // Main Card (Total)
             _buildMainForecastCard(),
             const SizedBox(height: 20),
 
@@ -207,40 +218,46 @@ class _PrevisionsScreenState extends State<PrevisionsScreen> {
             _buildChartCard(),
             const SizedBox(height: 20),
 
-            // Services List
+            // Categories List
             Text("Prévisions par service", style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold)),
-            Text("Comparaison avec les coûts historiques", style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[600])),
             const SizedBox(height: 16),
-            ..._serviceCosts.entries.map((e) {
-                // Only show if cost > 0
-               if (e.value <= 0) return const SizedBox.shrink(); 
-               return _buildServiceRow(e.key, e.value, _historicalCosts[e.key] ?? 0);
-            }).toList(),
-
-            const SizedBox(height: 20),
-            _buildAlertCard(),
-            const SizedBox(height: 20),
-            _buildAttentionCard(),
+            
+            if (_medicalActsData.isEmpty && _consumablesData.isEmpty && _staysData.isEmpty)
+              Center(child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text("Aucune donnée disponible", style: GoogleFonts.inter(color: Colors.grey)),
+              ))
+            else ...[
+               _buildCategoryRow("Actes Médicaux", _medicalActsData),
+               _buildCategoryRow("Consommables", _consumablesData),
+               _buildCategoryRow("Séjours", _staysData),
+            ],
+            
+            const SizedBox(height: 40),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPeriodButton(String text, bool isSelected) {
+  Widget _buildPeriodButton(String text, int days) {
+    bool isSelected = _selectedPeriod == days;
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.black : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(text, 
-          textAlign: TextAlign.center,
-          style: GoogleFonts.inter(
-            color: isSelected ? Colors.white : Colors.black, 
-            fontWeight: FontWeight.w600,
-            fontSize: 12
+      child: GestureDetector(
+        onTap: () => _onPeriodChanged(days),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.black : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(text, 
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              color: isSelected ? Colors.white : Colors.black, 
+              fontWeight: FontWeight.w600,
+              fontSize: 12
+            ),
           ),
         ),
       ),
@@ -253,7 +270,7 @@ class _PrevisionsScreenState extends State<PrevisionsScreen> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF2C5F78), Color(0xFF2C9F88)], // Teal Gradient similar to screenshot
+          colors: [Color(0xFF2C5F78), Color(0xFF2C9F88)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -266,28 +283,26 @@ class _PrevisionsScreenState extends State<PrevisionsScreen> {
             children: [
               const Icon(Icons.fingerprint, color: Colors.white70, size: 20),
               const SizedBox(width: 8),
-              Text("Prévision totale (30 jours)", style: GoogleFonts.inter(color: Colors.white70)),
+              Text("Prévision totale ($_selectedPeriod jours)", style: GoogleFonts.inter(color: Colors.white70)),
             ],
           ),
           const SizedBox(height: 12),
           Text(_currencyFormat.format(_totalPredictedCost), style: GoogleFonts.inter(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold)),
-          Text("Intervalle de confiance (95%)", style: GoogleFonts.inter(color: Colors.white38, fontSize: 12)),
-          Text("${_currencyFormat.format(_totalPredictedCost * 0.9)} - ${_currencyFormat.format(_totalPredictedCost * 1.1)}", style: GoogleFonts.inter(color: Colors.white38, fontSize: 12)),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(16)),
-            child: Text(
-              "Cette prévision est basée sur l'analyse des données historiques des 30 jours précédents, en tenant compte des tendances saisonnières.",
-               style: GoogleFonts.inter(color: Colors.white70, fontSize: 12),
-            ),
-          )
         ],
       ),
     );
   }
 
   Widget _buildChartCard() {
+    if (_spots.isEmpty) {
+      return Container(
+         height: 200,
+         width: double.infinity,
+         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+         child: Center(child: Text("Aucune donnée graphique disponible", style: GoogleFonts.inter(color: Colors.grey)))
+      );
+    }
+    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
@@ -295,34 +310,87 @@ class _PrevisionsScreenState extends State<PrevisionsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text("Projection des coûts futurs", style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold)),
-          Text("Évolution prévue par semaine", style: GoogleFonts.inter(fontSize: 12, color: Colors.grey)),
+          Text("Évolution prévue", style: GoogleFonts.inter(fontSize: 12, color: Colors.grey)),
           const SizedBox(height: 24),
           SizedBox(
-            height: 200,
+            height: 250,
             child: LineChart(
               LineChartData(
-                gridData: FlGridData(show: true, drawVerticalLine: true, getDrawingHorizontalLine: (value) => FlLine(color: Colors.grey[200]!, strokeWidth: 1)),
+                gridData: FlGridData(
+                  show: true, 
+                  drawVerticalLine: false,
+                  getDrawingHorizontalLine: (value) => FlLine(color: Colors.grey[100]!, strokeWidth: 1),
+                ),
                 titlesData: FlTitlesData(
-                  leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40, getTitlesWidget: (value, meta) => Text("${value ~/ 1000}k", style: const TextStyle(fontSize: 10, color: Colors.grey)))),
-                  bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, getTitlesWidget: (value, meta) => Text("Sem ${value.toInt() + 1}", style: const TextStyle(fontSize: 10, color: Colors.grey)))),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true, 
+                      reservedSize: 45,
+                      getTitlesWidget: (value, meta) => Text(
+                        _formatYAxis(value),
+                        style: const TextStyle(fontSize: 10, color: Colors.grey)
+                      )
+                    )
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: _spots.length > 10 ? (_spots.length / 5).toDouble() : 1, // Dynamic interval
+                      getTitlesWidget: (value, meta) {
+                        int index = value.toInt();
+                        if (index >= 0 && index < _xAxisLabels.length) {
+                           return Padding(
+                             padding: const EdgeInsets.only(top: 8.0),
+                             child: Text(_xAxisLabels[index], style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                           );
+                        }
+                        return const Text("");
+                      }
+                    )
+                  ),
                   topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                   rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 ),
                 borderData: FlBorderData(show: false),
                 minX: 0,
-                maxX: 7,
-                minY: 10000,
+                maxX: math.max(0, _spots.length.toDouble() - 1),
+                minY: _minY,
+                maxY: _maxY,
                 lineBarsData: [
                   LineChartBarData(
                     spots: _spots,
                     isCurved: true,
+                    curveSmoothness: 0.25,
                     color: const Color(0xFF2C5F78),
                     barWidth: 3,
                     isStrokeCapRound: true,
                     dotData: FlDotData(show: false),
-                    belowBarData: BarAreaData(show: true, color: const Color(0xFF2C5F78).withOpacity(0.1)),
+                    belowBarData: BarAreaData(
+                      show: true, 
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF2C5F78).withOpacity(0.2),
+                          const Color(0xFF2C5F78).withOpacity(0.0),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      )
+                    ),
                   ),
                 ],
+                lineTouchData: LineTouchData(
+                   touchTooltipData: LineTouchTooltipData(
+                     getTooltipColor: (spot) => Colors.blueGrey,
+                     getTooltipItems: (touchedSpots) {
+                       return touchedSpots.map((spot) {
+                         return LineTooltipItem(
+                           _currencyFormat.format(spot.y),
+                           const TextStyle(color: Colors.white),
+                         );
+                       }).toList();
+                     }
+                   )
+                )
               ),
             ),
           ),
@@ -330,145 +398,83 @@ class _PrevisionsScreenState extends State<PrevisionsScreen> {
       ),
     );
   }
+  
+  String _formatYAxis(double value) {
+    if (value >= 1000) return "${(value / 1000).toStringAsFixed(1)}k";
+    return value.toInt().toString();
+  }
 
-  Widget _buildServiceRow(String serviceName, double predicted, double historical) {
-    double percentChange = historical > 0 ? ((predicted - historical) / historical) * 100 : 0;
+  Widget _buildCategoryRow(String title, Map<String, dynamic> data) {
+    // FIX: Calculate Real Total from history (Period specific) instead of 'currentTotal' (All-time)
+    double real = 0.0;
+    if (data['history'] != null) {
+      for (var point in data['history']) {
+        if (point['real'] != null) {
+          real += (point['real'] as num).toDouble();
+        }
+      }
+    }
     
+    double predicted = (data['predictedTotal'] as num?)?.toDouble() ?? 0.0;
+    
+    double percentChange = 0;
+    if (real > 0) {
+      percentChange = ((predicted - real) / real) * 100;
+    } else if (predicted > 0) {
+      percentChange = 100;
+    }
+    
+    // Financial logic: Negative % is savings (Good/Green), Positive % is Cost Increase (Bad/Red)
+    bool isSaving = percentChange <= 0;
+    Color percentColor = isSaving ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(serviceName, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        "${percentChange > 0 ? '+' : ''}${percentChange.toStringAsFixed(1)}%",
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Historique:", style: GoogleFonts.inter(fontSize: 10, color: Colors.grey)),
-                        Text(_currencyFormat.format(historical), style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                    const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Prévu:", style: GoogleFonts.inter(fontSize: 10, color: Colors.grey)),
-                        Text(_currencyFormat.format(predicted), style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  ],
-                )
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: SizedBox(
-               height: 6,
-               child: LinearProgressIndicator(
-                 value: historical / (predicted + historical + 1), // Visualization logic
-                 backgroundColor: const Color(0xFF2C5F78),
-                 color: Colors.grey[300], // Inverted visual for style match
-                 borderRadius: BorderRadius.circular(3),
-               ),
-            ),
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAlertCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: const Color(0xFFE0F7FA), borderRadius: BorderRadius.circular(16)),
-      child: Row(
-       crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(color: Color(0xFF00ACC1), shape: BoxShape.circle),
-            child: const Icon(Icons.trending_up, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Augmentation prévue", style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: const Color(0xFF006064))),
-                const SizedBox(height: 4),
-                Text("Les services de chirurgie et de cardiologie montrent une tendance à la hausse significative.", 
-                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF00838F))),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-                  child: Text("Analyser les causes", style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold)),
-                )
-              ],
-            ),
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAttentionCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: const Color(0xFFFFF3E0), borderRadius: BorderRadius.circular(16)),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(color: Color(0xFFFF9800), shape: BoxShape.circle),
-            child: const Icon(Icons.priority_high, color: Colors.white, size: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(title, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: percentColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  "${percentChange > 0 ? '+' : ''}${percentChange.toStringAsFixed(1)}%",
+                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Points d'attention", style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: const Color(0xFFE65100))),
-                const SizedBox(height: 4),
-                Text("Le ratio coûts de personnel augmente de manière significative.", 
-                   style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFFEF6C00))),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.6), borderRadius: BorderRadius.circular(8)),
-                  child: Text("Voir les recommandations", style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold)),
-                )
-              ],
-            ),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: Color(0xFFEEEEEE)),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+               _buildStatItem("Total Réel ($_selectedPeriod j)", real),
+               _buildStatItem("Prévu", predicted),
+            ],
           )
         ],
       ),
+    );
+  }
+  
+  Widget _buildStatItem(String label, double val) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: GoogleFonts.inter(fontSize: 11, color: Colors.grey[600])),
+        const SizedBox(height: 2),
+        Text(_currencyFormat.format(val), style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: const Color(0xFF2C3E50))),
+      ],
     );
   }
 }

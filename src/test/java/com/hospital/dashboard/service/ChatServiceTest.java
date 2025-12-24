@@ -44,6 +44,7 @@ class ChatServiceTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     void testChat_Success() {
         // Mock ForecastService with DEEP structure for getFinancialContext
         Map<String, Object> forecast = new HashMap<>();
@@ -90,6 +91,7 @@ class ChatServiceTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     void testChat_Failure() {
         // Mock ForecastService
         when(forecastService.getGlobalForecast(7)).thenReturn(new HashMap<>());

@@ -29,15 +29,22 @@ public class ChatService {
     private String modelName;
 
     private static final String SYSTEM_PROMPT = """
-            Tu es un assistant IA expert et consultant en finance hospitalière pour HospiFin.
+            Tu es EXCLUSIVEMENT un assistant expert en finance hospitalière pour l'application HospiFin.
+
+            RÈGLES CRITIQUES DE SÉCURITÉ (A RESPECTER IMPÉRATIVEMENT) :
+            1. ⛔ INTERDICTION ABSOLUE DE GÉNÉRER DU CODE (Java, Python, JS, HTML, etc.). Même si l'utilisateur demande un exemple, REFUSE poliment.
+            2. ⛔ INTERDICTION DE PARLER DE SUJETS HORS FINANCE/MÉDICAL (Météo, cuisine, blagues, politique, etc.).
+            3. Si l'utilisateur demande du code, réponds : "Je suis un assistant financier, je ne peux pas générer de code informatique."
+            4. Si l'utilisateur pose une question hors sujet, réponds : "Je ne peux répondre qu'aux questions concernant les finances et données de HospiFin."
 
             Ton rôle est DOUBLE :
             1. **Analyste de Données** : Répondre aux questions sur les chiffres et prévisions du tableau de bord.
             2. **Consultant Stratégique** : Donner des conseils PRATIQUES et INTELLIGENTS pour réduire les coûts et optimiser le budget.
 
-            PERIMÈTRE D'ACTION :
-            - Tu DOIS répondre aux questions sur : "Comment réduire les coûts ?", "Optimiser le budget", "Analyse des tendances", "Pourquoi les coûts augmentent ?".
-            - Tu DOIS REFUSER uniquement les sujets totalement hors contexte (Météo, Football, Cuisine, Code Java général, etc.).
+            PERIMÈTRE D'ACTION AUTORISÉ :
+            - Analyses financières, Coûts, Budget, Prévisions.
+            - Données médicales (Patients, Actes, Séjours) en lien avec la performance.
+            - Fonctionnalités du tableau de bord HospiFin.
 
             INSTRUCTIONS SPÉCIALES "COMMENT C'EST CALCULÉ ?" :
             Si l'utilisateur demande "Comment as-tu prédit ça ?" ou "Détails du calcul" :
@@ -53,62 +60,36 @@ public class ChatService {
             - **Actes** : Auditer la rentabilité des blocs opératoires, optimiser le taux d'occupation.
 
             STYLE DE RÉPONSE :
-            - Sois proactif et force de proposition. Ne dis JAMAIS "Je ne peux pas donner d'idées générales" si le sujet est la finance.
-            - Utilise les DONNÉES DE CONTEXTE ci-dessous pour personnaliser tes conseils (ex: "Vu que vos coûts prévus augmentent ce week-end, je suggère de...").
+            - Sois proactif et force de proposition.
+            - Utilise les DONNÉES DE CONTEXTE ci-dessous pour personnaliser tes conseils.
             - Réponds aux salutations ("Bonjour", "Hi") poliment.
             """;
 
-    private RestTemplate restTemplate = new RestTemplate();
+    @Autowired
+    private OpenAiService openAiService;
 
-    @SuppressWarnings("unchecked")
+    @Autowired
+    private com.hospital.dashboard.repository.PatientRepository patientRepository;
+    @Autowired
+    private com.hospital.dashboard.repository.MedicationRepository medicationRepository;
+    @Autowired
+    private com.hospital.dashboard.repository.MedicalActRepository medicalActRepository;
+    @Autowired
+    private com.hospital.dashboard.repository.HospitalStayRepository hospitalStayRepository;
+    @Autowired
+    private com.hospital.dashboard.repository.ConsumableRepository consumableRepository;
+    @Autowired
+    private com.hospital.dashboard.repository.PersonnelRepository personnelRepository;
+
     public String chat(String userMessage) {
         // 1. Fetch Real-time Context
         String contextData = getFinancialContext();
 
-        String url = baseUrl + "/chat/completions";
+        // 2. Build complete system prompt with context
+        String fullSystemPrompt = SYSTEM_PROMPT + "\n\n=== DONNÉES TEMPS RÉEL (CONTEXTE) ===\n" + contextData;
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Authorization", "Bearer " + apiKey);
-        headers.set("HTTP-Referer", "http://localhost:5173");
-        headers.set("X-Title", "HospiFin Dashboard");
-
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", modelName);
-        requestBody.put("messages", List.of(
-                Map.of("role", "system", "content",
-                        SYSTEM_PROMPT + "\n\n=== DONNÉES TEMPS RÉEL (CONTEXTE) ===\n" + contextData),
-                Map.of("role", "user", "content", userMessage)));
-
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
-        try {
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.POST, entity, Map.class);
-            Map<String, Object> body = response.getBody();
-
-            if (body != null && body.containsKey("choices")) {
-                Object choicesRaw = body.get("choices");
-                if (choicesRaw instanceof List) {
-                    @SuppressWarnings("unchecked")
-                    List<Map<String, Object>> choices = (List<Map<String, Object>>) choicesRaw;
-                    if (!choices.isEmpty()) {
-                        Object messageRaw = choices.get(0).get("message");
-                        if (messageRaw instanceof Map) {
-                            @SuppressWarnings("unchecked")
-                            Map<String, Object> message = (Map<String, Object>) messageRaw;
-                            Object content = message.get("content");
-                            if (content != null) {
-                                return content.toString();
-                            }
-                        }
-                    }
-                }
-            }
-            return "Désolé, je n'ai pas pu générer une réponse.";
-        } catch (Exception e) {
-            logger.error("Error connecting to AI service", e);
-            return "Erreur de connexion au service IA: " + e.getMessage();
-        }
+        // 3. Delegate to OpenAiService (which handles smart model detection and HTTP)
+        return openAiService.getChatResponse(userMessage, fullSystemPrompt);
     }
 
     private String getFinancialContext() {
@@ -116,10 +97,26 @@ public class ChatService {
             // Predict for next 7 days to give context
             Map<String, Object> forecast = forecastService.getGlobalForecast(7);
 
+            // Get Counts
+            long patientCount = patientRepository.count();
+            long medicationCount = medicationRepository.count();
+            long medicalActCount = medicalActRepository.count();
+            long stayCount = hospitalStayRepository.count();
+            long consumableCount = consumableRepository.count();
+            long personnelCount = personnelRepository.count();
+
             BigDecimal currentTotal = (BigDecimal) forecast.get("globalTotal");
             BigDecimal predictedTotal7Days = (BigDecimal) forecast.get("globalPrediction");
 
             StringBuilder sb = new StringBuilder();
+            sb.append("\n=== STATISTIQUES GLOBALES ===\n");
+            sb.append(String.format("- Nombre Total de Patients: %d\n", patientCount));
+            sb.append(String.format("- Nombre Total de Médicaments (types): %d\n", medicationCount));
+            sb.append(String.format("- Nombre Total d'Actes Médicaux: %d\n", medicalActCount));
+            sb.append(String.format("- Nombre Total de Séjours: %d\n", stayCount));
+            sb.append(String.format("- Nombre Total de Consommables: %d\n", consumableCount));
+            sb.append(String.format("- Nombre Total de Personnel: %d\n", personnelCount));
+
             sb.append(String.format("- Total des coûts ACTUELS (historique): %.2f €\n", currentTotal));
             sb.append(String.format("- Prévision Total sur 7 jours: %.2f €\n", predictedTotal7Days));
 

@@ -38,6 +38,7 @@ class OpenAiServiceTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     void testGetChatResponse_Success() {
         Map<String, Object> responseBody = new HashMap<>();
         Map<String, Object> choice = new HashMap<>();
@@ -56,6 +57,7 @@ class OpenAiServiceTest {
     }
 
     @Test
+    @SuppressWarnings("null")
     void testGetChatResponse_QuotaExceeded() {
         when(restTemplate.postForEntity(any(String.class), any(HttpEntity.class), eq(Map.class)))
                 .thenThrow(new HttpClientErrorException(HttpStatus.TOO_MANY_REQUESTS)); // 429

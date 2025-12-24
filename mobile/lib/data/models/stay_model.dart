@@ -9,6 +9,8 @@ class HospitalStay {
   final DateTime endDate;
   final double totalCost;
   final String status;
+  final String pathology; // Store raw pathology for edit/create
+  final int? _patientId;
 
   HospitalStay({
     required this.id,
@@ -18,7 +20,11 @@ class HospitalStay {
     required this.endDate,
     required this.totalCost,
     required this.status,
-  });
+    required this.pathology,
+    int? patientId,
+  }) : _patientId = patientId;
+
+  int? get patientId => _patientId;
 
   factory HospitalStay.fromJson(Map<String, dynamic> json) {
     final patient = json['patient'] ?? {};
@@ -53,6 +59,19 @@ class HospitalStay {
       endDate: end,
       totalCost: total,
       status: statusStr,
+      pathology: pathology,
+      patientId: patient['id'],
     );
+  }
+
+  // To allow sending data to backend
+  Map<String, dynamic> toJson() {
+    return {
+      if (_patientId != null) 'patient': {'id': _patientId},
+      'startDate': DateFormat('yyyy-MM-dd').format(startDate),
+      'endDate': DateFormat('yyyy-MM-dd').format(endDate),
+      'dailyRate': (totalCost / (endDate.difference(startDate).inDays + 1)).toStringAsFixed(2),
+      'pathology': pathology, 
+    };
   }
 }

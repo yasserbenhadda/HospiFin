@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/services/dashboard_service.dart';
+import '../../data/services/forecast_service.dart'; // Added
+import '../widgets/custom_header.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -13,7 +15,12 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final DashboardService _dashboardService = DashboardService();
-  late Future<Map<String, dynamic>> _dashboardData;
+  final ForecastService _forecastService = ForecastService();
+
+  bool _isLoading = true;
+  String? _error;
+  Map<String, dynamic>? _summaryData;
+  Map<String, dynamic>? _forecastData;
 
   @override
   void initState() {
@@ -21,107 +28,75 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _refreshData();
   }
 
-  void _refreshData() {
+  Future<void> _refreshData() async {
     setState(() {
-      _dashboardData = _dashboardService.getSummary();
+      _isLoading = true;
+      _error = null;
     });
+    try {
+      final results = await Future.wait([
+        _dashboardService.getSummary(),
+        _forecastService.getForecast(30),
+      ]);
+      
+      if (mounted) {
+        setState(() {
+          _summaryData = results[0];
+          _forecastData = results[1];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async => _refreshData(),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(),
+      appBar: const CustomHeader(
+        title: 'Tableau de bord',
+        subtitle: "Vue d'ensemble",
+        showBackButton: false,
+      ),
+      body: RefreshIndicator(
+        onRefresh: _refreshData,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildControls(),
+              const SizedBox(height: 24),
+              
+              if (_isLoading)
+                 const Center(child: Padding(padding: EdgeInsets.all(32.0), child: CircularProgressIndicator()))
+              else if (_error != null)
+                 _buildErrorState(_error!)
+              else ...[
+                _buildKpiGrid(_summaryData!),
                 const SizedBox(height: 24),
-                
-                FutureBuilder<Map<String, dynamic>>(
-                  future: _dashboardData,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snapshot.hasError) {
-                      return _buildErrorState(snapshot.error.toString());
-                    }
-
-                    final data = snapshot.data!;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildKpiGrid(data),
-                        const SizedBox(height: 24),
-                        _buildChartsSection(data),
-                        const SizedBox(height: 24),
-                        _buildRecentStaysList(data),
-                      ],
-                    );
-                  },
-                ),
+                _buildChartsSection(), // No arguments, will access state fields directly or I can pass them
+                const SizedBox(height: 24),
+                _buildRecentStaysList(_summaryData!),
               ],
-            ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildControls() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              "Tableau de bord ...",
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
-                letterSpacing: -1,
-                fontFamily: 'Inter', 
-              ),
-            ),
-            Row(
-              children: [
-                IconButton(onPressed: () {}, icon: const Icon(Icons.notifications_none_outlined, color: AppColors.textSecondary)),
-                const SizedBox(width: 8),
-                const CircleAvatar(
-                  backgroundColor: AppColors.secondary, 
-                  radius: 18,
-                  child: Icon(Icons.person_outline, color: Colors.white, size: 20),
-                ),
-              ],
-            )
-          ],
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          "Vue d'ensemble",
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-            letterSpacing: -0.5,
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          "Période du 1 au 30 novembre 2025",
-          style: TextStyle(
-            fontSize: 14,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 16),
         Row(
           children: [
              _buildDropdownButton("30 jours"),
@@ -294,8 +269,192 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildChartsSection(Map<String, dynamic> data) {
-    // Placeholder for charts to keep it correct - in real implementation we map 'forecastData'
+  Widget _buildChartsSection() {
+    return Column(
+      children: [
+        // --- CHART 1: LINE CHART (Predicted Cost) ---
+        // --- CHART 1: LINE CHART (Predicted Cost) ---
+        _buildChartContainer(
+          title: "Coût prédit",
+          subtitle: "Évolution sur 30 jours",
+          child: (_forecastData != null && _forecastData!['globalHistory'] != null)
+            ? LineChart(
+              LineChartData(
+                gridData: FlGridData(show: true, drawVerticalLine: false, getDrawingHorizontalLine: (value) => const FlLine(color: AppColors.border, strokeWidth: 1)),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: 5,
+                      getTitlesWidget: (value, meta) {
+                        final history = _forecastData!['globalHistory'] as List; // Updated key
+                        if (value.toInt() >= 0 && value.toInt() < history.length && value.toInt() % 5 == 0) {
+                          final dateStr = history[value.toInt()]['month'] ?? '';
+                          try {
+                            final date = DateTime.parse(dateStr);
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Text(DateFormat('dd/MM').format(date), style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                            );
+                          } catch (e) {
+                             return const SizedBox.shrink();
+                          }
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                lineTouchData: LineTouchData(
+                   touchTooltipData: LineTouchTooltipData(
+                      getTooltipColor: (_) => Colors.blueGrey,
+                      getTooltipItems: (touchedSpots) {
+                        return touchedSpots.map((spot) {
+                           return LineTooltipItem(
+                             '${NumberFormat.currency(locale: 'fr_FR', symbol: '€', decimalDigits: 0).format(spot.y)}',
+                             const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                           );
+                        }).toList();
+                      }
+                   ),
+                ),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: (_forecastData!['globalHistory'] as List).asMap().entries.map((e) { // Updated key
+                      return FlSpot(e.key.toDouble(), (e.value['predicted'] ?? 0).toDouble());
+                    }).toList(),
+                    isCurved: true,
+                    color: AppColors.secondary,
+                    barWidth: 3,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(show: true, color: AppColors.secondary.withOpacity(0.1)),
+                  ),
+                ],
+              ),
+            )
+            : Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text("Données de prévision indisponibles", style: TextStyle(color: AppColors.textSecondary)),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Debug Keys: ${_forecastData?.keys.toList().toString()}",
+                      style: const TextStyle(fontSize: 10, color: Colors.grey),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+        ),
+          
+        const SizedBox(height: 24),
+
+        // --- CHART 2: BAR CHART (Cost by Service) ---
+        _buildChartContainer(
+          title: "Coût par service",
+          subtitle: "Répartition par département",
+          child: (_summaryData != null && _summaryData!['costByService'] != null)
+            ? BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: (_summaryData!['costByService'] as List).fold<double>(0, (max, e) => (e['value'] ?? 0) > max ? (e['value'] ?? 0).toDouble() : max) * 1.2,
+                barTouchData: BarTouchData(
+                   touchTooltipData: BarTouchTooltipData(
+                      getTooltipColor: (_) => Colors.blueGrey,
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                         return BarTooltipItem(
+                           '${NumberFormat.currency(locale: 'fr_FR', symbol: '€', decimalDigits: 0).format(rod.toY)}',
+                           const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                         );
+                      }
+                   )
+                ),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        final data = _summaryData!['costByService'] as List;
+                        if (value.toInt() >= 0 && value.toInt() < data.length) {
+                          final name = data[value.toInt()]['name'] ?? '';
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: SizedBox(
+                              width: 60,
+                              child: Text(
+                                name, 
+                                style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                ),
+                gridData: FlGridData(show: true, drawVerticalLine: false, getDrawingHorizontalLine: (value) => const FlLine(color: AppColors.border, strokeWidth: 1)),
+                borderData: FlBorderData(show: false),
+                barGroups: (_summaryData!['costByService'] as List).asMap().entries.map((e) {
+                  return BarChartGroupData(
+                    x: e.key,
+                    barRods: [
+                      BarChartRodData(
+                        toY: (e.value['value'] ?? 0).toDouble(),
+                        color: const Color(0xFF1E3A8A), // Dark Blue
+                        width: 16,
+                        borderRadius: const BorderRadius.only(topLeft: Radius.circular(4), topRight: Radius.circular(4)),
+                      )
+                    ],
+                  );
+                }).toList(),
+              ),
+            )
+            : const Center(child: Text("Données de service indisponibles", style: TextStyle(color: AppColors.textSecondary))),
+        ),
+        const SizedBox(height: 24),
+
+        // --- CHART 3: PIE CHART (Cost Distribution) ---
+        _buildChartContainer(
+          title: "Répartition des coûts",
+          subtitle: "Par catégorie",
+          child: (_summaryData != null && _summaryData!['costByCategory'] != null && (_summaryData!['costByCategory'] as List).isNotEmpty) 
+            ? PieChart(
+                PieChartData(
+                  sectionsSpace: 2,
+                  centerSpaceRadius: 40,
+                  sections: (_summaryData!['costByCategory'] as List).asMap().entries.map((e) {
+                     final index = e.key;
+                     final data = e.value;
+                     final colors = [const Color(0xFF1E3A8A), const Color(0xFF14B8A6), const Color(0xFF60A5FA), const Color(0xFFF97316)];
+                     return PieChartSectionData(
+                       color: colors[index % colors.length],
+                       value: (data['value'] ?? 0).toDouble(),
+                       title: '${(data['value'] ?? 0).toInt()}€',
+                       radius: 50,
+                       titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                     );
+                  }).toList(),
+                ),
+              )
+            : const Center(child: Text("Données non disponibles", style: TextStyle(color: AppColors.textSecondary))),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChartContainer({required String title, required String subtitle, required Widget child}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -304,51 +463,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         border: Border.all(color: AppColors.border),
         boxShadow: const [BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.03), offset: Offset(0, 1), blurRadius: 2)],
       ),
-      height: 300,
+      height: 320,
       child: Column(
          crossAxisAlignment: CrossAxisAlignment.start,
          children: [
-           const Text("Coût prédit (30 jours)", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+           Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+           Text(subtitle, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
            const SizedBox(height: 20),
-           Expanded(
-             child: LineChart(
-               LineChartData(
-                 gridData: FlGridData(
-                   show: true,
-                   drawVerticalLine: false,
-                   getDrawingHorizontalLine: (value) => const FlLine(color: AppColors.border, strokeWidth: 1),
-                 ),
-                 titlesData: FlTitlesData(
-                   leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                   rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                   topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                   bottomTitles: AxisTitles(
-                     sideTitles: SideTitles(
-                       showTitles: true,
-                       interval: 5,
-                        getTitlesWidget: (value, meta) {
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Text('${value.toInt()}', style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-                          );
-                        },
-                     ),
-                   ),
-                 ),
-                 borderData: FlBorderData(show: false),
-                 lineBarsData: [
-                   LineChartBarData(
-                     spots: const [FlSpot(0, 20), FlSpot(5, 40), FlSpot(10, 30), FlSpot(20, 50), FlSpot(30, 45)], // Mocked for visuals
-                     isCurved: true,
-                     color: AppColors.secondary,
-                     barWidth: 3,
-                     dotData: const FlDotData(show: false),
-                     belowBarData: BarAreaData(show: true, color: AppColors.secondary.withOpacity(0.1)),
-                   ),
-                 ],
-               ),
-             ),
-           ),
+           Expanded(child: child),
          ],
       ),
     );

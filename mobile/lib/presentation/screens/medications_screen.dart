@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/services/medication_service.dart';
+import '../widgets/custom_header.dart'; // Added
 
 class MedicationsScreen extends StatefulWidget {
   const MedicationsScreen({super.key});
@@ -70,18 +71,10 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
-      appBar: AppBar(
-        title: Text('Médicaments', style: GoogleFonts.inter(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(icon: const Icon(Icons.notifications_none, color: Colors.grey), onPressed: () {}),
-          const CircleAvatar(
-             backgroundColor: Color(0xFF00796B),
-             child: Icon(Icons.person, color: Colors.white),
-          ),
-          const SizedBox(width: 16),
-        ],
+      appBar: const CustomHeader(
+        title: 'Médicaments',
+        subtitle: 'Gestion de la pharmacie',
+        showBackButton: true,
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,21 +84,7 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                if (Navigator.of(context).canPop())
-                   Padding(
-                      padding: const EdgeInsets.only(right: 12.0),
-                      child: IconButton(
-                         icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
-                         onPressed: () => Navigator.of(context).pop(),
-                         padding: EdgeInsets.zero,
-                         constraints: const BoxConstraints(),
-                         style: IconButton.styleFrom(
-                           backgroundColor: Colors.white,
-                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: const BorderSide(color: Color(0xFFE2E8F0))),
-                           padding: const EdgeInsets.all(8)
-                         ),
-                      ),
-                   ),
+
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -321,74 +300,77 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
     await showDialog(
       context: context,
       builder: (context) => Dialog(
+        backgroundColor: const Color(0xFFEFF3F8), // High Contrast Background
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Container(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-               Text(isEdit ? "Modifier le médicament" : "Nouveau médicament", 
-                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B))),
-              const SizedBox(height: 24),
-              _buildStyledTextField(controller: nameController, label: "Nom"),
-              const SizedBox(height: 16),
-              _buildStyledTextField(controller: categoryController, label: "Catégorie"),
-              const SizedBox(height: 16),
-              _buildStyledTextField(controller: costController, label: "Coût Unitaire (€)", isNumber: true),
-              const SizedBox(height: 16),
-              _buildStyledTextField(controller: stockController, label: "Stock", isNumber: true),
-              const SizedBox(height: 16),
-              _buildStyledTextField(controller: unitController, label: "Unité"),
-              const SizedBox(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text("Annuler", style: GoogleFonts.inter(color: const Color(0xFF64748B), fontWeight: FontWeight.w600)),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () async {
-                      try {
-                        final data = {
-                          'name': nameController.text,
-                          'category': categoryController.text,
-                          'unitCost': double.tryParse(costController.text) ?? 0.0,
-                          'stock': int.tryParse(stockController.text) ?? 0,
-                          'unit': unitController.text,
-                        };
-
-                        if (isEdit) {
-                          await _service.updateMedication(item['id'], data);
-                        } else {
-                          await _service.createMedication(data);
-                        }
-                        if (mounted) Navigator.pop(context);
-                        _loadMedications();
-                        if (mounted) {
-                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isEdit ? "Modifié avec succès" : "Créé avec succès")));
-                        }
-                      } catch (e) {
-                        print(e);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Une erreur est survenue"), backgroundColor: Colors.red));
-                        }
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1E293B),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      elevation: 0,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                 Text(isEdit ? "Modifier le médicament" : "Nouveau médicament", 
+                  style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B))),
+                const SizedBox(height: 24),
+                _buildStyledTextField(controller: nameController, label: "Nom"),
+                const SizedBox(height: 16),
+                _buildStyledTextField(controller: categoryController, label: "Catégorie"),
+                const SizedBox(height: 16),
+                _buildStyledTextField(controller: costController, label: "Coût Unitaire (€)", isNumber: true),
+                const SizedBox(height: 16),
+                _buildStyledTextField(controller: stockController, label: "Stock", isNumber: true),
+                const SizedBox(height: 16),
+                _buildStyledTextField(controller: unitController, label: "Unité"),
+                const SizedBox(height: 32),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text("Annuler", style: GoogleFonts.inter(color: const Color(0xFF64748B), fontWeight: FontWeight.w600)),
                     ),
-                    child: Text("Enregistrer", style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-                  ),
-                ],
-              )
-            ],
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () async {
+                        try {
+                          final data = {
+                            'name': nameController.text,
+                            'category': categoryController.text,
+                            'unitCost': double.tryParse(costController.text) ?? 0.0,
+                            'stock': int.tryParse(stockController.text) ?? 0,
+                            'unit': unitController.text,
+                          };
+
+                          if (isEdit) {
+                            await _service.updateMedication(item['id'], data);
+                          } else {
+                            await _service.createMedication(data);
+                          }
+                          if (mounted) Navigator.pop(context);
+                          _loadMedications();
+                          if (mounted) {
+                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isEdit ? "Modifié avec succès" : "Créé avec succès")));
+                          }
+                        } catch (e) {
+                          print(e);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Une erreur est survenue"), backgroundColor: Colors.red));
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1E293B),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
+                      ),
+                      child: Text("Enregistrer", style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                    ),
+                  ],
+                )
+              ],
+            ),
           ),
         ),
       ),
@@ -402,8 +384,9 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
       style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF1E293B)),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: GoogleFonts.inter(color: const Color(0xFF64748B), fontSize: 14),
-        floatingLabelStyle: GoogleFonts.inter(color: const Color(0xFF1E293B), fontWeight: FontWeight.w600),
+        labelStyle: GoogleFonts.inter(color: const Color(0xFF1E293B), fontSize: 13, fontWeight: FontWeight.bold),
+        floatingLabelStyle: GoogleFonts.inter(color: const Color(0xFF1E293B), fontWeight: FontWeight.bold),
+        floatingLabelBehavior: FloatingLabelBehavior.always, // Consistent High Contrast Style
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

@@ -7,26 +7,42 @@ class MedicalActService {
 
   Future<List<MedicalAct>> getMedicalActs() async {
     try {
-      print('MedicalActService: Fetching from ${ApiConstants.baseUrl}/medical-acts');
       final response = await _dio.get('${ApiConstants.baseUrl}/medical-acts');
-      print('MedicalActService: Status ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data;
-        print('MedicalActService: Received ${data.length} acts');
         return data.map((json) {
-           try {
              return MedicalAct.fromJson(json);
-           } catch (e) {
-             print('MedicalActService: Error parsing act: $e, JSON: $json');
-             rethrow;
-           }
         }).toList();
       }
       return [];
     } catch (e) {
-      print('Error fetching medical acts: $e');
       throw Exception('Failed to load medical acts: $e');
+    }
+  }
+
+  Future<void> createMedicalAct(MedicalAct act) async {
+    try {
+      final data = act.toJson();
+      data.remove('id');
+      await _dio.post('${ApiConstants.baseUrl}/medical-acts', data: data);
+    } catch (e) {
+      throw Exception('Failed to create medical act: $e');
+    }
+  }
+
+  Future<void> updateMedicalAct(MedicalAct act) async {
+    try {
+      await _dio.put('${ApiConstants.baseUrl}/medical-acts/${act.id}', data: act.toJson());
+    } catch (e) {
+      throw Exception('Failed to update medical act: $e');
+    }
+  }
+
+  Future<void> deleteMedicalAct(int id) async {
+    try {
+      await _dio.delete('${ApiConstants.baseUrl}/medical-acts/$id');
+    } catch (e) {
+      throw Exception('Failed to delete medical act: $e');
     }
   }
 }

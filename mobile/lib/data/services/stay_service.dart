@@ -7,27 +7,43 @@ class StayService {
 
   Future<List<HospitalStay>> getStays() async {
     try {
-      print('StayService: Fetching from ${ApiConstants.baseUrl}/stays');
       final response = await _dio.get('${ApiConstants.baseUrl}/stays');
-      
-      print('StayService: Status ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data;
-        print('StayService: Received ${data.length} stays');
         return data.map((json) {
-          try {
             return HospitalStay.fromJson(json);
-          } catch (e) {
-            print('StayService: Error parsing stay: $e, JSON: $json');
-            rethrow;
-          }
         }).toList();
       }
       return [];
     } catch (e) {
-      print('Error fetching stays: $e');
       throw Exception('Failed to load stays: $e');
+    }
+  }
+
+  Future<void> createStay(HospitalStay stay) async {
+    try {
+      final data = stay.toJson();
+      // Remove ID for creation
+      data.remove('id');
+      await _dio.post('${ApiConstants.baseUrl}/stays', data: data);
+    } catch (e) {
+      throw Exception('Failed to create stay: $e');
+    }
+  }
+
+  Future<void> updateStay(HospitalStay stay) async {
+    try {
+      await _dio.put('${ApiConstants.baseUrl}/stays/${stay.id}', data: stay.toJson());
+    } catch (e) {
+      throw Exception('Failed to update stay: $e');
+    }
+  }
+
+  Future<void> deleteStay(int id) async {
+    try {
+      await _dio.delete('${ApiConstants.baseUrl}/stays/$id');
+    } catch (e) {
+      throw Exception('Failed to delete stay: $e');
     }
   }
 }
